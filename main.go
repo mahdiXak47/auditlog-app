@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	//"github.com/rogpeppe/go-internal/cache"
-	//"github.com/stretchr/testify/require"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +40,8 @@ func main() {
 		log.Fatalln("failed to build kubernetes client from the kube config")
 	}
 
+	getUserData()
+
 	ctx := context.Background()
 
 	if err := executeRbacAccessCycle(ctx, kubernetesClient); err != nil {
@@ -55,25 +55,39 @@ func main() {
 		select {
 		case <-ticket.C:
 			if err := executeRbacAccessCycle(ctx, kubernetesClient); err != nil {
-				log.Println("one cycle is getting executed with error:", err)
+				log.Println("cycle execute got an error:", err)
 			}
 		}
 	}
 }
 
+func getUserData() {
+	in, err := LoadInputFile("input.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	principals := ExtractPrincipals(in)
+	for _, p := range principals {
+		subjects := SubjectsForPrincipal(p)
+		fmt.Println(p.Username, subjects)
+	}
+}
+
 // running one full RBAC access collection + reporting cycle
 func executeRbacAccessCycle(ctx context.Context, kubernetesClient *kubernetes.Clientset) error {
-	runCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	//runCtx, cancel := context.WithTimeout(ctx, 30*time.Second) // for production
+	runCtx, cancel := context.WithCancel(ctx) //for debugging
 	defer cancel()
 
 	//getting role binding and cluster role binding list from kubernetes api server
-	crbs, rbs, err := receiveLogsFromApiServer(runCtx, kubernetesClient)
+	crbs, rbs, clusterRoles, roles, err := receiveLogsFromApiServer(runCtx, kubernetesClient)
 	if err != nil {
 		return fmt.Errorf("can not get the role binding list from kubernetes api server: %w", err)
 	}
 	//fmt.Printf("crbs=%+v\n", *crbs)
 	//fmt.Printf("rbs=%+v\n", *rbs)
-	records := processLogs(crbs, rbs)
+	records := processLogs(crbs, rbs, clusterRoles, roles)
 	printReport(records)
 
 	return nil
@@ -108,8 +122,9 @@ func printReport(records []Access) {
 	}
 }
 
-func processLogs(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingList) []Access {
-	records := make([]Access, 0, len(crbs.Items)+len(rbs.Items))
+func processLogs(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingList,
+	clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList) []Access {
+	records := make([]Access, 0, len(crbs.Items)+len(rbs.Items)) //creating the accesses list
 
 	for _, b := range crbs.Items {
 		records = append(records, bindingToRecordsCluster(b)...)
@@ -118,7 +133,7 @@ func processLogs(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingLis
 		records = append(records, bindingToRecordsNamespaced(b)...)
 	}
 
-	//creating the output
+	// implementation of sort function
 	sort.Slice(records, func(i, j int) bool {
 		a, b := records[i], records[j]
 		if a.kind != b.kind {
@@ -140,17 +155,18 @@ func processLogs(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingLis
 
 func bindingToRecordsCluster(b rbacv1.ClusterRoleBinding) []Access {
 	out := make([]Access, 0, len(b.Subjects))
-	for _, s := range b.Subjects {
+	for _, s := range b.Subjects { // in ghesmat mitoone tamiz tar bashe WARN
 		out = append(out, Access{
-			kind:       s.Kind,
-			name:       s.Name,
-			namespace:  s.Namespace,
-			namespaced: true,
-			//roleRefKind: s.RoleRef.Kind, // inja va khate bayeen begayyee
-			//roleRefName: s.ReleRef.Name, // ERRORRRRRR
-			binding: "ClusterRoleBinding/" + b.Name,
+			kind:        s.Kind,
+			name:        s.Name,
+			namespace:   s.Namespace,
+			namespaced:  false, // these are cluster scope accesses
+			roleRefKind: b.RoleRef.Kind,
+			roleRefName: b.RoleRef.Name,
+			binding:     "ClusterRoleBinding/" + b.Name,
 		})
 	}
+	//fmt.Printf("out is: %s\n", out)
 	return out
 }
 
@@ -163,12 +179,13 @@ func bindingToRecordsNamespaced(b rbacv1.RoleBinding) []Access {
 			kind:        s.Kind,
 			name:        s.Name,
 			namespace:   pickNamespaceForSubject(s, b.Namespace),
-			namespaced:  true, // in nokte begayy dare ERRORRRRR
+			namespaced:  true, // these are namespaces accesses
 			roleRefKind: b.RoleRef.Kind,
 			roleRefName: b.RoleRef.Name,
 			binding:     "RoleBinding/" + b.Namespace + "/" + b.Name,
 		})
 	}
+	//fmt.Printf("out is: %s\n", out)
 	return out
 }
 
@@ -184,20 +201,31 @@ func pickNamespaceForSubject(s rbacv1.Subject, bindingNamespace string) string {
 }
 
 // fetching the RBAC binding from the kubernetes api server
-func receiveLogsFromApiServer(ctx context.Context, client *kubernetes.Clientset) (*rbacv1.ClusterRoleBindingList, *rbacv1.RoleBindingList, error) {
+func receiveLogsFromApiServer(ctx context.Context, client *kubernetes.Clientset) (*rbacv1.ClusterRoleBindingList, *rbacv1.RoleBindingList, *rbacv1.ClusterRoleList, *rbacv1.RoleList, error) {
 
-	crbs, err := client.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
+	opts := metav1.ListOptions{}
+	crbs, err := client.RbacV1().ClusterRoleBindings().List(ctx, opts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("can not get the role binding list from kubernetes api server: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("can not get the cluster role binding list from cluster: %w", err)
 	}
 
 	// "" means all namespaces
-	rbs, err := client.RbacV1().RoleBindings("").List(ctx, metav1.ListOptions{})
+	rbs, err := client.RbacV1().RoleBindings("").List(ctx, opts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("can not get the role binding list from kubernetes api server: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("can not get the role binding list from cluster: %w", err)
 	}
 
-	return crbs, rbs, nil
+	clusterRoles, err := client.RbacV1().ClusterRoles().List(ctx, opts)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("can not get the cluster role list from cluster: %w", err)
+	}
+
+	roles, err := client.RbacV1().Roles("").List(ctx, opts)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("can not get the role list from cluster: %w", err)
+	}
+
+	return crbs, rbs, clusterRoles, roles, nil
 }
 
 func buildKubernetesClient() (*kubernetes.Clientset, error) {
