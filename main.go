@@ -89,24 +89,33 @@ func executeRbacAccessCycle(
 	reports := BuildReportsForAllNamespaces(principals, records, idx, namespaceList)
 
 	//printReport(records)
-	if err := PrintReportsAsJson(reports); err != nil {
-		log.Println("printing the report as json got an error:", err)
+	outputPath := getEnv("OUTPUT_JSONL_PATH", "./shared/reports.jsonl")
+	if err := PrintReportsAsJson(outputPath, reports); err != nil {
+		return fmt.Errorf("printing the report as json got an error: %w", err)
 	}
+
+	fmt.Printf("cycle complete: users=%d written to %s\n", len(reports), outputPath)
 	return err
 }
 
-func PrintReportsAsJson(reports []UserAccessReport) error {
-	b, err := json.MarshalIndent(reports, "", "  ")
-	if err != nil {
-		println(err.Error())
-		return err
+func PrintReportsAsJson(path string, reports []UserAccessReport) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	formatted := inlineVerbArrays(string(b))
-	fmt.Println(formatted)
-	err = os.WriteFile("output-of-the-code.json", []byte(formatted), 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write json output: %w", err)
+		return err
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+
+	for _, r := range reports {
+		if err := enc.Encode(r); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -251,4 +260,11 @@ func buildKubernetesClient() (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return kubernetes.NewForConfig(cfg)
+}
+
+func getEnv(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
 }

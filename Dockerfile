@@ -2,6 +2,9 @@
 FROM hub.hamdocker.ir/golang:1.22-alpine AS builder
 
 #WORKDIR /src
+COPY sidecar/go.mod sidecar/go.sum ./
+RUN go mod download
+COPY sidecar/ ./
 
 # Install CA certs (useful for TLS to API server, registries, etc.)
 RUN apk add --no-cache ca-certificates
@@ -15,7 +18,10 @@ COPY . .
 
 # Build a static binary (good for minimal images)
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/rbac-audit .
+    go build -trimpath -ldflags="-s -w" -o /out/rbac-audit . \
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/rbac-sidecar .
+
 
 # -------- Runtime stage --------
 FROM gcr.hamdocker.ir/distroless/static:nonroot
