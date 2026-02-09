@@ -20,20 +20,13 @@ type InputFile struct {
 }
 
 type InputDataEntry struct {
-	Configs   []InputConfig            `json:"configs"`
-	Internals map[string]InputInternal `json:"internals"` // key = internal id
+	Configs   []InputConfig        `json:"configs"`
+	Internals map[string]Principal `json:"internals"` // key = internal id
 }
 
 type InputConfig struct {
 	ID   string `json:"id"`
 	Data string `json:"data"` // base64-encoded JSON
-}
-type InputInternal struct {
-	Source    string   `json:"source"`
-	Username  string   `json:"username"`
-	Groups    []string `json:"groups"`
-	FirstName string   `json:"first_name"`
-	LastName  string   `json:"last_name"`
 }
 
 type Principal struct {
@@ -45,7 +38,7 @@ type Principal struct {
 	LastName   string
 }
 
-type DecodedConfig struct {
+type DecodedConfig struct { //in struct ham noke dare bnzrm ERROR
 	ID      string
 	Payload map[string]any
 }
