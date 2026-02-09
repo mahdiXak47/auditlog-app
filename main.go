@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -46,7 +47,7 @@ func main() {
 
 	kubernetesClient, err := buildKubernetesClient()
 	if err != nil {
-		log.Fatalln("failed to build kubernetes client from the kube config")
+		log.Fatalln("failed to build kubernetes client from the kubeconfig")
 	}
 
 	ctx := context.Background()
@@ -71,13 +72,13 @@ func executeRbacAccessCycle(
 	defer cancel()
 
 	//getting role binding and cluster role binding list from kubernetes api server
-	crbs, rbs, clusterRoles, roles, namespaces, err := receiveLogsFromApiServer(runCtx, kubernetesClient)
+	clusterRbs, rbs, clusterRoles, roles, namespaces, err := receiveLogsFromApiServer(runCtx, kubernetesClient)
 	if err != nil {
 		return fmt.Errorf("can not get the role binding list from kubernetes api server: %w", err)
 	}
-	//fmt.Printf("crbs=%+v\n", *crbs)
+	//fmt.Printf("clusterRbs=%+v\n", *clusterRbs)
 	//fmt.Printf("rbs=%+v\n", *rbs)
-	records := processLogs(crbs, rbs, clusterRoles, roles)
+	records := getRoleBindingsList(clusterRbs, rbs)
 
 	var namespaceList []string
 	for _, ns := range namespaces.Items {
@@ -103,6 +104,10 @@ func PrintReportsAsJson(reports []UserAccessReport) error {
 
 	formatted := inlineVerbArrays(string(b))
 	fmt.Println(formatted)
+	err = os.WriteFile("output-of-the-code.json", []byte(formatted), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write json output: %w", err)
+	}
 	return nil
 }
 
@@ -118,38 +123,8 @@ func inlineVerbArrays(input string) string {
 	})
 }
 
-func printReport(records []Access) {
-	now := time.Now().Format(time.RFC3339)
-	fmt.Printf("\n --- RBAC access report @ %s ---\n", now)
-	fmt.Printf("total bindings resolved to subject mappings: %d\n", len(records))
-
-	bySubject := map[string][]Access{}
-	keys := make([]string, 0)
-
-	for _, record := range records {
-		subKey := fmt.Sprintf("%s/%s", record.kind, record.name)
-		if record.kind == "ServiceAccount" && record.namespace != "" {
-			subKey = fmt.Sprintf("%s:%s/%s", record.kind, record.namespace, record.name)
-		}
-		if _, ok := bySubject[subKey]; !ok {
-			keys = append(keys, subKey)
-		}
-		bySubject[subKey] = append(bySubject[subKey], record)
-	}
-
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		fmt.Printf("\n - %s\n", k)
-		for _, r := range bySubject[k] {
-			fmt.Printf("  - scope=%s roleRef=%s/%s binding=%s\n", r.namespaced, r.roleRefKind, r.roleRefName, r.binding)
-		}
-	}
-}
-
 // fek konam esmesh bayad avaz beshe WARN
-func processLogs(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingList,
-	clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList) []Access {
+func getRoleBindingsList(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingList) []Access {
 	records := make([]Access, 0, len(crbs.Items)+len(rbs.Items)) //creating the accesses list
 
 	for _, b := range crbs.Items {

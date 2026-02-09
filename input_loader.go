@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"sort"
@@ -38,16 +37,6 @@ type Principal struct {
 	LastName   string   `json:"last_name"`
 }
 
-type DecodedConfig struct { //in struct ham noke dare bnzrm ERROR
-	ID      string
-	Payload map[string]any
-}
-
-type SubjectKey struct {
-	Kind string // "User" or "Group" (later could be "ServiceAccount")
-	Name string
-}
-
 func LoadInputFile(path string) (*InputFile, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
@@ -80,43 +69,6 @@ func ExtractPrincipals(in *InputFile) []Principal {
 		return out[i].Username < out[j].Username
 	})
 	return out
-}
-
-func SubjectsForPrincipal(p Principal) []SubjectKey {
-	var subs []SubjectKey
-	if p.Username != "" {
-		subs = append(subs, SubjectKey{Kind: "User", Name: p.Username})
-	}
-	for _, g := range p.Groups {
-		if g == "" {
-			continue
-		}
-		subs = append(subs, SubjectKey{Kind: "Group", Name: g})
-	}
-
-	return subs
-}
-
-func DecodeBase64Data(in *InputFile) ([]DecodedConfig, error) {
-	var out []DecodedConfig
-
-	for _, entry := range in.Data {
-		for _, c := range entry.Configs {
-			raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(c.Data))
-			if err != nil {
-				return nil, fmt.Errorf("decode base64 config id=%s: %w", c.ID, err)
-			}
-
-			var payload map[string]any
-			if err := json.Unmarshal(raw, &payload); err != nil {
-				return nil, fmt.Errorf("decode config json id=%s: %w", c.ID, err)
-			}
-
-			out = append(out, DecodedConfig{ID: c.ID, Payload: payload})
-		}
-	}
-
-	return out, nil
 }
 
 func normalizeAndSortGroups(groups []string) []string {
