@@ -4,19 +4,44 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
-type Bulkline struct {
+type BulkAction struct {
 	Index map[string]string `json:"index"`
+}
+
+type BulkResp struct {
+	Errors bool `json:"errors"`
+	Items  []map[string]struct {
+		Status int             `json:"status"`
+		Error  json.RawMessage `json:"error,omitempty"`
+	} `json:"items"`
+}
+
+func stableID(line []byte) string {
+	sum := sha256.Sum256(line)
+	return hex.EncodeToString(sum[:])
+}
+
+func writeOffsetAtomic(path string, v int64) error {
+	dir := filepath.Dir(path)
+	tmp := filepath.Join(dir, ".offset.tmp")
+	if err := os.WriteFile(tmp, []byte(strconv.FormatInt(v, 10)), 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 func main() {
@@ -39,26 +64,33 @@ func main() {
 
 func shipOnce(ctx context.Context, client *http.Client) error {
 	elasticSearchURL := getenv("ELASTICSEARCH_URL", "https://mahdixak-security-auditdb.darkube.app/")
-	index := getenv("ELASTICSEARCH_INDEX", "rbac-audit")
+	index := getenv("ELASTICSEARCH_INDEX", "audit-logs")
 	dataPath := getenv("ELASTICSEARCH_DATA_PATH", "../shared/reports.jsonl")
 	offsetPath := getenv("ELASTICSEARCH_OFFSET_PATH", "../shared/.offset")
-	flushEvery := getenvInt("FLUSH_EVERY", 200) // batch size
-	off, _ := readOffset(offsetPath)
+	flushEvery := getenvInt("FLUSH_EVERY", 10) // batch size
 	esUser := os.Getenv("ES_USERNAME")
 	esPass := os.Getenv("ES_PASSWORD")
+
+	log.Printf("sidecar starting | es=%s index=%s dataPath=%s offsetPath=%s flushEvery=%d user=%s basicAuth=%t",
+		elasticSearchURL, index, dataPath, offsetPath, flushEvery, esUser, esPass != "")
+
+	//off, _ := readOffset(offsetPath)
 	f, err := os.Open(dataPath)
-
-	//log.Printf("sidecar starting | es=%s index=%s dataPath=%s offsetPath=%s flushEvery=%d pollEvery=%s basicAuth=%t",
-	//	elasticSearchURL, index, dataPath, offsetPath, flushEvery, esUser != "" || esPass != "")
-
-	if err != nil && !os.IsNotExist(err) {
-		log.Printf("readOffset warning (will start from 0): %v", err)
+	//if err != nil && !os.IsNotExist(err) {
+	//	log.Printf("readOffset warning (will start from 0): %v", err)
+	//	off = 0
+	//}
+	off, offErr := readOffset(offsetPath)
+	if offErr != nil && !os.IsNotExist(offErr) {
+		log.Printf("readOffset warning (starting from 0): %v", offErr)
 		off = 0
 	}
 
 	if err != nil {
 		if os.IsNotExist(err) { // if the file is not created yet we will wait
 			log.Printf("data file not found yet (%s) - waiting...", dataPath)
+			log.Printf("error is : %v", err)
+			time.Sleep(10 * time.Second)
 			return nil
 		}
 		return fmt.Errorf("open data file: %w", err)
@@ -77,43 +109,58 @@ func shipOnce(ctx context.Context, client *http.Client) error {
 		bulk bytes.Buffer
 		n    int
 	)
-
 	flush := func(newOffset int64) error {
 		if n == 0 {
 			return nil
 		}
 
-		req, err := http.NewRequestWithContext(ctx, "POST", elasticSearchURL+"/_bulk", bytes.NewReader(bulk.Bytes()))
+		req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(elasticSearchURL, "/")+"/_bulk", bytes.NewReader(bulk.Bytes()))
 		if err != nil {
 			return fmt.Errorf("create bulk request: %w", err)
 		}
-
 		req.Header.Set("Content-Type", "application/x-ndjson")
-
 		if esUser != "" || esPass != "" {
 			req.SetBasicAuth(esUser, esPass)
 		}
-
-		log.Printf("flushing | docs=%d bytes=%d newOffset=%d", n, bulk.Len(), newOffset)
 
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("bulk request failed: %w", err)
 		}
-
 		defer resp.Body.Close()
 
+		body, _ := io.ReadAll(resp.Body)
+
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
-			body, _ := io.ReadAll(resp.Body)
 			return fmt.Errorf("bulk status=%s body=%s", resp.Status, string(body))
 		}
 
-		if err := writeOffset(offsetPath, newOffset); err != nil {
-			return err
+		// IMPORTANT: detect partial failures
+		var br BulkResp
+		if err := json.Unmarshal(body, &br); err != nil {
+			// if ES returns something unexpected, be safe: don't advance offset
+			return fmt.Errorf("bulk response decode error: %w body=%s", err, string(body))
+		}
+		if br.Errors {
+			// log a few errors; do NOT advance offset
+			log.Printf("bulk partial errors detected; NOT advancing offset")
+			seen := 0
+			for _, it := range br.Items {
+				for _, v := range it {
+					if v.Status >= 300 && seen < 5 {
+						log.Printf("bulk item failed status=%d error=%s", v.Status, string(v.Error))
+						seen++
+					}
+				}
+			}
+			return fmt.Errorf("bulk had partial errors")
+		}
+
+		if err := writeOffsetAtomic(offsetPath, newOffset); err != nil {
+			return fmt.Errorf("write offset: %w", err)
 		}
 
 		log.Printf("flush success | docs=%d wroteOffset=%d", n, newOffset)
-
 		bulk.Reset()
 		n = 0
 		return nil
@@ -121,26 +168,59 @@ func shipOnce(ctx context.Context, client *http.Client) error {
 
 	for {
 		startOffset, _ := f.Seek(0, io.SeekCurrent)
-
-		//line, err := r.ReadString('\n')
 		line, err := r.ReadBytes('\n')
 		if err != nil {
 			if err == io.EOF {
+				// If we got partial data without newline, ship it too
+				if len(bytes.TrimSpace(line)) > 0 {
+					// process 'line' exactly like a normal line
+					line = bytes.TrimSpace(line)
+
+					var js any
+					if e := json.Unmarshal(line, &js); e != nil {
+						return fmt.Errorf("invalid json at offset %d: %w | line=%s", startOffset, e, string(line))
+					}
+
+					docID := stableID(line)
+					action := BulkAction{Index: map[string]string{"_index": index, "_id": docID}}
+					ab, _ := json.Marshal(action)
+
+					bulk.Write(ab)
+					bulk.WriteByte('\n')
+					bulk.Write(line)
+					bulk.WriteByte('\n')
+					n++
+				}
+
 				endOffset, _ := f.Seek(0, io.SeekCurrent)
 				return flush(endOffset)
 			}
 			return fmt.Errorf("read bytes: %w", err)
 		}
 
-		if len(bytes.TrimSpace(line)) == 0 {
-			return fmt.Errorf("invalid json in offset %d: %s", startOffset, line)
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue // skip empty lines safely
 		}
 
-		action := Bulkline{Index: map[string]string{"_index": index}}
+		// optional: validate JSON line (cheap safety)
+		var js any
+		if err := json.Unmarshal(line, &js); err != nil {
+			return fmt.Errorf("invalid json at offset %d: %w | line=%s", startOffset, err, string(line))
+		}
+
+		// Add stable _id to prevent duplicates on retry/restart
+		docID := stableID(line)
+
+		action := BulkAction{Index: map[string]string{
+			"_index": index,
+			"_id":    docID,
+		}}
+
 		ab, _ := json.Marshal(action)
 		bulk.Write(ab)
 		bulk.WriteByte('\n')
-		bulk.Write(bytes.TrimSpace(line))
+		bulk.Write(line)
 		bulk.WriteByte('\n')
 		n++
 

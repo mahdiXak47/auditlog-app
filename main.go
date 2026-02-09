@@ -99,6 +99,11 @@ func executeRbacAccessCycle(
 }
 
 func PrintReportsAsJson(path string, reports []UserAccessReport) error {
+	b, err := json.MarshalIndent(reports, "", "  ")
+	if err != nil {
+		println(err.Error())
+		return err
+	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -109,6 +114,13 @@ func PrintReportsAsJson(path string, reports []UserAccessReport) error {
 		return err
 	}
 	defer f.Close()
+
+	formatted := inlineVerbArrays(string(b))
+	fmt.Println(formatted)
+	err = os.WriteFile("output-of-the-code.json", []byte(formatted), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write json output: %w", err)
+	}
 
 	enc := json.NewEncoder(f)
 

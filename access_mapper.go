@@ -8,19 +8,32 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
-type ResourceVerbs map[string][]string // pod -> get , list , delete , felan
+//type ResourceVerbs map[string][]string // pod -> get , list , delete , felan
 
-type AccessEntry struct {
-	Namespace string        `json:"namespace"`  // target namespace (or "*" if you want)
-	Resources ResourceVerbs `json:"resources"`  // resource -> verbs
-	IsCluster bool          `json:"is_cluster"` // true if came from ClusterRoleBinding
+//type AccessEntry struct {
+//	Namespace string        `json:"namespace"`  // target namespace (or "*" if you want)
+//	Resources ResourceVerbs `json:"resources"`  // resource -> verbs
+//	IsCluster bool          `json:"is_cluster"` // true if came from ClusterRoleBinding
+//}
+
+type Rule struct {
+	Resource string   `json:"resource"`           // e.g. "pods", "*", "pods/log"
+	Verbs    []string `json:"verbs"`              // e.g. ["get","list"] or ["*"]
+	APIGroup string   `json:"apiGroup,omitempty"` // optional improvement
+}
+
+type ScopeEntry struct {
+	Scope     string `json:"scope"`     // "cluster" or "namespaced"
+	Namespace string `json:"namespace"` // actual namespace
+	Rules     []Rule `json:"rules"`
 }
 
 type UserAccessReport struct {
-	Username  string        `json:"username"`
-	Groups    []string      `json:"groups"`
-	Accesses  []AccessEntry `json:"accesses"`
-	Timestamp string        `json:"timestamp"`
+	Type      string       `json:"type"` // e.g. "rbac_effective_permissions"
+	Timestamp string       `json:"@timestamp"`
+	Username  string       `json:"username"`
+	Groups    []string     `json:"groups"`
+	Scopes    []ScopeEntry `json:"scopes"`
 }
 
 func BuildReportsForAllNamespaces(
@@ -32,12 +45,13 @@ func BuildReportsForAllNamespaces(
 
 	out := make([]UserAccessReport, 0, len(principals))
 	for _, p := range principals {
-		entries := aggregateForPrincipalAllNamespaces(p, records, idx, namespaces)
+		scopes := aggregateForPrincipalAllNamespaces(p, records, idx, namespaces)
 
 		out = append(out, UserAccessReport{
+			Type:      "rbac_effective_permissions",
 			Username:  p.Username,
 			Groups:    p.Groups,
-			Accesses:  entries,
+			Scopes:    scopes,
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		})
 	}
@@ -49,7 +63,7 @@ func aggregateForPrincipalAllNamespaces(
 	records []Access,
 	idx *roleIndex,
 	allNamespaces []string,
-) []AccessEntry {
+) []ScopeEntry {
 
 	// Keys like: "User:mohammad.jafari", "Group:sre-production"
 	subjectKeys := map[string]struct{}{
@@ -103,18 +117,36 @@ func aggregateForPrincipalAllNamespaces(
 		}
 	}
 
-	// Convert to []AccessEntry
-	entries := make([]AccessEntry, 0, len(agg))
+	// Convert agg to []ScopeEntry
+	scopes := make([]ScopeEntry, 0, len(agg))
 	for ns, res := range agg {
-		entries = append(entries, AccessEntry{
+		scope := "namespaced"
+		if isClusterForNS[ns] {
+			scope = "cluster"
+		}
+
+		scopes = append(scopes, ScopeEntry{
+			Scope:     scope,
 			Namespace: ns,
-			Resources: finalizeResources(res),
-			IsCluster: isClusterForNS[ns],
+			Rules:     finalizeRules(res), // <-- new function returns []Rule
 		})
 	}
 
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Namespace < entries[j].Namespace })
-	return entries
+	sort.Slice(scopes, func(i, j int) bool { return scopes[i].Namespace < scopes[j].Namespace })
+	return scopes
+	// Convert to []AccessEntry
+	//entries := make([]AccessEntry, 0, len(agg))
+	//for ns, res := range agg {
+	//	entries = append(entries, AccessEntry{
+	//		Namespace: ns,
+	//		//Resources: finalizeResources(res),
+	//		Resources: finalizeRules(res),
+	//		IsCluster: isClusterForNS[ns],
+	//	})
+	//}
+	//
+	//sort.Slice(entries, func(i, j int) bool { return entries[i].Namespace < entries[j].Namespace })
+	//return entries
 }
 
 func normalizeVerbs(in []string) []string {
@@ -141,26 +173,67 @@ func resolveRules(idx *roleIndex, roleRefKind, roleRefName, bindingNamespace str
 	}
 }
 
-func finalizeResources(resourceVerbSet map[string]map[string]struct{}) ResourceVerbs {
-	out := make(ResourceVerbs, len(resourceVerbSet))
-	fullVerbSet := map[string]struct{}{
-		"create": {},
-		"delete": {},
-		"get":    {},
-		"list":   {},
-		"patch":  {},
-		"update": {},
-		"watch":  {},
-	}
-	for res, verbSet := range resourceVerbSet {
+//func finalizeResources(resourceVerbSet map[string]map[string]struct{}) ResourceVerbs {
+//	out := make(ResourceVerbs, len(resourceVerbSet))
+//	fullVerbSet := map[string]struct{}{
+//		"create": {},
+//		"delete": {},
+//		"get":    {},
+//		"list":   {},
+//		"patch":  {},
+//		"update": {},
+//		"watch":  {},
+//	}
+//	for res, verbSet := range resourceVerbSet {
+//
+//		// If rule already contains "*", no need to check further
+//		if _, hasWildcard := verbSet["*"]; hasWildcard {
+//			out[res] = []string{"*"}
+//			continue
+//		}
+//
+//		// Check if verbSet contains all full verbs
+//		hasAll := true
+//		for v := range fullVerbSet {
+//			if _, ok := verbSet[v]; !ok {
+//				hasAll = false
+//				break
+//			}
+//		}
+//
+//		if hasAll {
+//			out[res] = []string{"*"}
+//			continue
+//		}
+//
+//		// Otherwise output sorted verbs normally
+//		var verbs []string
+//		for v := range verbSet {
+//			verbs = append(verbs, v)
+//		}
+//		sort.Strings(verbs)
+//		out[res] = verbs
+//	}
+//
+//	// stable keys are handled by JSON marshaller order? not guaranteed, but fine.
+//	return out
+//}
 
-		// If rule already contains "*", no need to check further
+func finalizeRules(resourceVerbSet map[string]map[string]struct{}) []Rule {
+	out := make([]Rule, 0, len(resourceVerbSet))
+
+	fullVerbSet := map[string]struct{}{
+		"create": {}, "delete": {}, "get": {}, "list": {}, "patch": {}, "update": {}, "watch": {},
+	}
+
+	for res, verbSet := range resourceVerbSet {
+		// If any wildcard verb exists, compress to "*"
 		if _, hasWildcard := verbSet["*"]; hasWildcard {
-			out[res] = []string{"*"}
+			out = append(out, Rule{Resource: res, Verbs: []string{"*"}})
 			continue
 		}
 
-		// Check if verbSet contains all full verbs
+		// If verbSet contains all common verbs, compress to "*"
 		hasAll := true
 		for v := range fullVerbSet {
 			if _, ok := verbSet[v]; !ok {
@@ -168,22 +241,21 @@ func finalizeResources(resourceVerbSet map[string]map[string]struct{}) ResourceV
 				break
 			}
 		}
-
 		if hasAll {
-			out[res] = []string{"*"}
+			out = append(out, Rule{Resource: res, Verbs: []string{"*"}})
 			continue
 		}
 
-		// Otherwise output sorted verbs normally
-		var verbs []string
+		verbs := make([]string, 0, len(verbSet))
 		for v := range verbSet {
 			verbs = append(verbs, v)
 		}
 		sort.Strings(verbs)
-		out[res] = verbs
+		out = append(out, Rule{Resource: res, Verbs: verbs})
 	}
 
-	// stable keys are handled by JSON marshaller order? not guaranteed, but fine.
+	// stable ordering for nice diffs / deterministic docs
+	sort.Slice(out, func(i, j int) bool { return out[i].Resource < out[j].Resource })
 	return out
 }
 

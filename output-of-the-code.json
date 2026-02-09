@@ -1,499 +1,966 @@
 [
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "ali.ahmadi",
     "groups": ["devops","sre-production"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "cluster",
         "namespace": "default",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "dev-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-node-lease",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-public",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-system",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "local-path-storage",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "qa-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "amir.karimi",
     "groups": ["devops","sre-production"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "cluster",
         "namespace": "default",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "dev-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-node-lease",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-public",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-system",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "local-path-storage",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "qa-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "jafar.mohammadi",
     "groups": ["dev","qa"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "namespaced",
         "namespace": "default",
-        "resources": {
-          "configmaps": ["get","list"],
-          "services": ["get","list"]
-        },
-        "is_cluster": false
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["get","list"]
+          },
+          {
+            "resource": "services",
+            "verbs": ["get","list"]
+          }
+        ]
       },
       {
+        "scope": "namespaced",
         "namespace": "dev-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "pods": ["*"],
-          "services": ["*"]
-        },
-        "is_cluster": false
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "services",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "namespaced",
         "namespace": "qa-ns",
-        "resources": {
-          "pods": ["get","list","watch"],
-          "pods/log": ["get","list","watch"]
-        },
-        "is_cluster": false
+        "rules": [
+          {
+            "resource": "pods",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "pods/log",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "leila.mohammadi",
     "groups": ["cluster-readonly","qa"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "cluster",
         "namespace": "default",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "dev-ns",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-node-lease",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-public",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-system",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "local-path-storage",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "qa-ns",
-        "resources": {
-          "*": ["get","list","watch"],
-          "pods": ["get","list","watch"],
-          "pods/log": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "pods/log",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "mohammad.jafari",
     "groups": ["cluster-readonly","sre-production"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "cluster",
         "namespace": "default",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "dev-ns",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-node-lease",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-public",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-system",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "local-path-storage",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "qa-ns",
-        "resources": {
-          "*": ["get","list","watch"],
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "neda.ahmadi",
     "groups": ["dev","qa"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "namespaced",
         "namespace": "default",
-        "resources": {
-          "configmaps": ["get","list"],
-          "services": ["get","list"]
-        },
-        "is_cluster": false
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["get","list"]
+          },
+          {
+            "resource": "services",
+            "verbs": ["get","list"]
+          }
+        ]
       },
       {
+        "scope": "namespaced",
         "namespace": "dev-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "pods": ["*"],
-          "services": ["*"]
-        },
-        "is_cluster": false
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "services",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "namespaced",
         "namespace": "qa-ns",
-        "resources": {
-          "pods": ["get","list","watch"],
-          "pods/log": ["get","list","watch"]
-        },
-        "is_cluster": false
+        "rules": [
+          {
+            "resource": "pods",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "pods/log",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "reza.karimi",
     "groups": ["dev","sre-production"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "cluster",
         "namespace": "default",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"],
-          "services": ["get","list"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "services",
+            "verbs": ["get","list"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "dev-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"],
-          "services": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "services",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-node-lease",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-public",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-system",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "local-path-storage",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "qa-ns",
-        "resources": {
-          "configmaps": ["*"],
-          "nodes": ["*"],
-          "pods": ["*"],
-          "secrets": ["*"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "configmaps",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "nodes",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["*"]
+          },
+          {
+            "resource": "secrets",
+            "verbs": ["*"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   },
   {
+    "type": "rbac_effective_permissions",
+    "@timestamp": "2026-02-09T19:46:14Z",
     "username": "sara.mohammadi",
     "groups": ["cluster-readonly","qa"],
-    "accesses": [
+    "scopes": [
       {
+        "scope": "cluster",
         "namespace": "default",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "dev-ns",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-node-lease",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-public",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "kube-system",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "local-path-storage",
-        "resources": {
-          "*": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       },
       {
+        "scope": "cluster",
         "namespace": "qa-ns",
-        "resources": {
-          "*": ["get","list","watch"],
-          "pods": ["get","list","watch"],
-          "pods/log": ["get","list","watch"]
-        },
-        "is_cluster": true
+        "rules": [
+          {
+            "resource": "*",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "pods",
+            "verbs": ["get","list","watch"]
+          },
+          {
+            "resource": "pods/log",
+            "verbs": ["get","list","watch"]
+          }
+        ]
       }
-    ],
-    "timestamp": "2026-02-09T09:09:38Z"
+    ]
   }
 ]
