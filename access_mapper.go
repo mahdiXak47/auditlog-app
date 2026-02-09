@@ -26,13 +26,9 @@ type UserAccessReport struct {
 func BuildReportsForAllNamespaces(
 	principals []Principal,
 	records []Access,
-	clusterRoles *rbacv1.ClusterRoleList,
-	roles *rbacv1.RoleList,
+	idx *roleIndex,
 	namespaces []string,
-	now time.Time,
 ) []UserAccessReport {
-
-	idx := buildRoleIndex(clusterRoles, roles)
 
 	out := make([]UserAccessReport, 0, len(principals))
 	for _, p := range principals {
@@ -42,7 +38,7 @@ func BuildReportsForAllNamespaces(
 			Username:  p.Username,
 			Groups:    p.Groups,
 			Accesses:  entries,
-			Timestamp: now.UTC().Format(time.RFC3339),
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		})
 	}
 	return out
@@ -51,7 +47,7 @@ func BuildReportsForAllNamespaces(
 func aggregateForPrincipalAllNamespaces(
 	p Principal,
 	records []Access,
-	idx roleIndex,
+	idx *roleIndex,
 	allNamespaces []string,
 ) []AccessEntry {
 
@@ -125,16 +121,14 @@ func aggregateForPrincipalAllNamespaces(
 func reportForNamespaceAccess(
 	principals []Principal,
 	records []Access,
-	clusterRoles *rbacv1.ClusterRoleList,
-	roles *rbacv1.RoleList,
+	idx *roleIndex,
 	selectedNamespace string,
 	now time.Time,
 ) ([]UserAccessReport, error) {
 
-	roleIndex := buildRoleIndex(clusterRoles, roles)
 	out := make([]UserAccessReport, 0, len(principals))
 	for _, p := range principals {
-		allowed := aggregateForPrincipal(p, records, roleIndex, selectedNamespace)
+		allowed := aggregateForPrincipal(p, records, idx, selectedNamespace)
 
 		out = append(out, UserAccessReport{
 			Username:  p.Username,
@@ -146,7 +140,7 @@ func reportForNamespaceAccess(
 	return out, nil
 }
 
-func aggregateForPrincipal(p Principal, records []Access, index roleIndex, selectedNamespace string) []AccessEntry {
+func aggregateForPrincipal(p Principal, records []Access, index *roleIndex, selectedNamespace string) []AccessEntry {
 	// subject match keys for this principal
 	subjectKeys := make(map[string]struct{}, 1+len(p.Groups))
 	subjectKeys["User:"+p.Username] = struct{}{}
@@ -226,7 +220,7 @@ func normalizeVerbs(in []string) []string {
 	return out
 }
 
-func resolveRules(idx roleIndex, roleRefKind, roleRefName, bindingNamespace string) []rbacv1.PolicyRule {
+func resolveRules(idx *roleIndex, roleRefKind, roleRefName, bindingNamespace string) []rbacv1.PolicyRule {
 	switch roleRefKind {
 	case "ClusterRole":
 		return idx.clusterRoleRules[roleRefName]
@@ -240,7 +234,38 @@ func resolveRules(idx roleIndex, roleRefKind, roleRefName, bindingNamespace stri
 
 func finalizeResources(resourceVerbSet map[string]map[string]struct{}) ResourceVerbs {
 	out := make(ResourceVerbs, len(resourceVerbSet))
+	fullVerbSet := map[string]struct{}{
+		"create": {},
+		"delete": {},
+		"get":    {},
+		"list":   {},
+		"patch":  {},
+		"update": {},
+		"watch":  {},
+	}
 	for res, verbSet := range resourceVerbSet {
+
+		// If rule already contains "*", no need to check further
+		if _, hasWildcard := verbSet["*"]; hasWildcard {
+			out[res] = []string{"*"}
+			continue
+		}
+
+		// Check if verbSet contains all full verbs
+		hasAll := true
+		for v := range fullVerbSet {
+			if _, ok := verbSet[v]; !ok {
+				hasAll = false
+				break
+			}
+		}
+
+		if hasAll {
+			out[res] = []string{"*"}
+			continue
+		}
+
+		// Otherwise output sorted verbs normally
 		var verbs []string
 		for v := range verbSet {
 			verbs = append(verbs, v)
@@ -292,7 +317,7 @@ type roleIndex struct {
 	roleRules        map[string][]rbacv1.PolicyRule // "ns/name" -> rules
 }
 
-func buildRoleIndex(clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList) roleIndex {
+func buildRoleIndex(clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList) *roleIndex {
 	cr := make(map[string][]rbacv1.PolicyRule, len(clusterRoles.Items))
 	for _, r := range clusterRoles.Items {
 		cr[r.Name] = r.Rules
@@ -303,5 +328,8 @@ func buildRoleIndex(clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList
 		key := r.Namespace + "/" + r.Name
 		rr[key] = r.Rules
 	}
-	return roleIndex{clusterRoleRules: cr, roleRules: rr}
+	return &roleIndex{
+		clusterRoleRules: cr,
+		roleRules:        rr,
+	}
 }

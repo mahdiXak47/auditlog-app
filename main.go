@@ -6,8 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -22,7 +22,7 @@ import (
 )
 
 type Access struct {
-	kind        string
+	kind        string // user group or serviceAccount
 	name        string
 	namespace   string
 	namespaced  bool
@@ -51,8 +51,6 @@ func main() {
 
 	ctx := context.Background()
 
-	getUserData()
-
 	ticket := time.NewTicker(*interval)
 	defer ticket.Stop()
 
@@ -61,19 +59,6 @@ func main() {
 			log.Println("cycle execute got an error:", err)
 		}
 		<-ticket.C
-	}
-}
-
-func getUserData() {
-	in, err := LoadInputFile("input.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	principals := ExtractPrincipals(in)
-	for _, p := range principals {
-		subjects := SubjectsForPrincipal(p)
-		fmt.Println(p.Username, subjects)
 	}
 }
 
@@ -98,17 +83,39 @@ func executeRbacAccessCycle(
 	for _, ns := range namespaces.Items {
 		namespaceList = append(namespaceList, ns.Name)
 	}
-	reports := BuildReportsForAllNamespaces(principals, records, clusterRoles, roles, namespaceList, time.Now())
+	idx := buildRoleIndex(clusterRoles, roles)
+
+	reports := BuildReportsForAllNamespaces(principals, records, idx, namespaceList)
 
 	//printReport(records)
-
-	return PrintReportsAsJson(reports)
+	if err := PrintReportsAsJson(reports); err != nil {
+		log.Println("printing the report as json got an error:", err)
+	}
+	return err
 }
 
 func PrintReportsAsJson(reports []UserAccessReport) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(reports)
+	b, err := json.MarshalIndent(reports, "", "  ")
+	if err != nil {
+		println(err.Error())
+		return err
+	}
+
+	formatted := inlineVerbArrays(string(b))
+	fmt.Println(formatted)
+	return nil
+}
+
+func inlineVerbArrays(input string) string {
+	re := regexp.MustCompile(`\[\n(\s+)"([^"]+)"(,\n\s+"[^"]+")*\n\s*]`)
+
+	return re.ReplaceAllStringFunc(input, func(match string) string {
+		// Remove newlines and spaces
+		oneLine := strings.ReplaceAll(match, "\n", "")
+		oneLine = strings.ReplaceAll(oneLine, "  ", "")
+		oneLine = strings.ReplaceAll(oneLine, " ", "")
+		return oneLine
+	})
 }
 
 func printReport(records []Access) {
@@ -140,6 +147,7 @@ func printReport(records []Access) {
 	}
 }
 
+// fek konam esmesh bayad avaz beshe WARN
 func processLogs(crbs *rbacv1.ClusterRoleBindingList, rbs *rbacv1.RoleBindingList,
 	clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList) []Access {
 	records := make([]Access, 0, len(crbs.Items)+len(rbs.Items)) //creating the accesses list

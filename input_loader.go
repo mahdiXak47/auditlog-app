@@ -30,12 +30,12 @@ type InputConfig struct {
 }
 
 type Principal struct {
-	InternalID string
-	Source     string
-	Username   string
-	Groups     []string
-	FirstName  string
-	LastName   string
+	InternalID string   `json:"-"`
+	Source     string   `json:"source"`
+	Username   string   `json:"username"`
+	Groups     []string `json:"groups"`
+	FirstName  string   `json:"first_name"`
+	LastName   string   `json:"last_name"`
 }
 
 type DecodedConfig struct { //in struct ham noke dare bnzrm ERROR
@@ -53,12 +53,10 @@ func LoadInputFile(path string) (*InputFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while trying to read input.json: %w", err)
 	}
-
 	var in InputFile
 	if err := json.Unmarshal(bytes, &in); err != nil {
 		return nil, fmt.Errorf("error while trying to unmarshal input.json: %w", err)
 	}
-
 	return &in, nil
 }
 
