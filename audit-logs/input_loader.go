@@ -40,11 +40,11 @@ type Principal struct {
 func LoadInputFile(path string) (*InputFile, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("error while trying to read input.json: %w", err)
+		return nil, fmt.Errorf("error while trying to read input file %s: %w", path, err)
 	}
 	var in InputFile
 	if err := json.Unmarshal(bytes, &in); err != nil {
-		return nil, fmt.Errorf("error while trying to unmarshal input.json: %w", err)
+		return nil, fmt.Errorf("error while trying to unmarshal input file %s: %w", path, err)
 	}
 	return &in, nil
 }

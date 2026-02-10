@@ -39,7 +39,8 @@ func main() {
 	flag.Parse()
 	println("audit log app has been started")
 
-	in, err := LoadInputFile("input.json")
+	inputPath := getEnv("INPUT_PATH", "../shared/json-files/input.json")
+	in, err := LoadInputFile(inputPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,12 +90,12 @@ func executeRbacAccessCycle(
 	reports := BuildReportsForAllNamespaces(principals, records, idx, namespaceList)
 
 	//printReport(records)
-	outputPath := getEnv("OUTPUT_JSONL_PATH", "./shared/reports.jsonl")
+	outputPath := getEnv("OUTPUT_JSONL_PATH", "../shared/reports.jsonl")
 	if err := PrintReportsAsJson(outputPath, reports); err != nil {
 		return fmt.Errorf("printing the report as json got an error: %w", err)
 	}
 
-	flatPath := getEnv("OUTPUT_FLAT_JSONL_PATH", "./shared/reports-flat.jsonl")
+	flatPath := getEnv("OUTPUT_FLAT_JSONL_PATH", "../shared/reports-flat.jsonl")
 	flat := FlattenReports(reports)
 	if err := PrintFlatAsJsonL(flatPath, flat); err != nil {
 		return fmt.Errorf("writing flat report: %w", err)
@@ -119,11 +120,18 @@ func PrintReportsAsJson(path string, reports []UserAccessReport) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(f)
 
 	formatted := inlineVerbArrays(string(b))
 	fmt.Println(formatted)
-	err = os.WriteFile("output-of-the-code.json", []byte(formatted), 0644)
+
+	debugOutputPath := getEnv("DEBUG_OUTPUT_PATH", "../shared/json-files/output-of-the-code.json")
+	err = os.WriteFile(debugOutputPath, []byte(formatted), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write json output: %w", err)
 	}
@@ -148,7 +156,12 @@ func PrintFlatAsJsonL(path string, rows []FlatPermission) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(f)
 
 	enc := json.NewEncoder(f)
 	for _, row := range rows {
