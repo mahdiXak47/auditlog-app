@@ -36,6 +36,42 @@ type UserAccessReport struct {
 	Scopes    []ScopeEntry `json:"scopes"`
 }
 
+// FlatPermission this class is creating another index in elasticsearch for filtering better on grafana dashboards for nested objects(resources and verbs and namespaces in Scope)
+type FlatPermission struct {
+	Timestamp string   `json:"@timestamp"`
+	Type      string   `json:"type"`
+	Username  string   `json:"username"`
+	Groups    []string `json:"groups"`
+	Namespace string   `json:"namespace"`
+	Scope     string   `json:"scope"`    // "cluster" or "namespaced"
+	Resource  string   `json:"resource"` // e.g. "pods/log"
+	Verb      string   `json:"verb"`     // e.g. "get"
+}
+
+func FlattenReports(reports []UserAccessReport) []FlatPermission {
+	out := make([]FlatPermission, 0, 1000)
+
+	for _, r := range reports {
+		for _, sc := range r.Scopes {
+			for _, rule := range sc.Rules {
+				for _, verb := range rule.Verbs {
+					out = append(out, FlatPermission{
+						Timestamp: r.Timestamp,
+						Type:      "rbac_effective_permission_flat",
+						Username:  r.Username,
+						Groups:    r.Groups,
+						Namespace: sc.Namespace,
+						Scope:     sc.Scope,
+						Resource:  rule.Resource,
+						Verb:      verb,
+					})
+				}
+			}
+		}
+	}
+	return out
+}
+
 func BuildReportsForAllNamespaces(
 	principals []Principal,
 	records []Access,

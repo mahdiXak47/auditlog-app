@@ -94,6 +94,12 @@ func executeRbacAccessCycle(
 		return fmt.Errorf("printing the report as json got an error: %w", err)
 	}
 
+	flatPath := getEnv("OUTPUT_FLAT_JSONL_PATH", "./shared/reports-flat.jsonl")
+	flat := FlattenReports(reports)
+	if err := PrintFlatAsJsonL(flatPath, flat); err != nil {
+		return fmt.Errorf("writing flat report: %w", err)
+	}
+
 	fmt.Printf("cycle complete: users=%d written to %s\n", len(reports), outputPath)
 	return err
 }
@@ -126,6 +132,27 @@ func PrintReportsAsJson(path string, reports []UserAccessReport) error {
 
 	for _, r := range reports {
 		if err := enc.Encode(r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func PrintFlatAsJsonL(path string, rows []FlatPermission) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	for _, row := range rows {
+		if err := enc.Encode(row); err != nil {
 			return err
 		}
 	}
