@@ -36,10 +36,17 @@ var (
 		Help: "Number of RBAC flat permission documents in the window.",
 	})
 
+	// number of distinct usernames seen in the window
 	usersTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "rbac_users_total",
 		Help: "Number of distinct usernames seen in the window.",
 	})
+
+	sensitiveAccessUsers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "k8s_namespace_sensitive_access_users_count",
+		Help: "Count of distinct users that have sensitive accesses (secrets, deployments, configmaps) for a verb in a resource in a namespace.",
+	}, []string{"namespace", "verb", "resource"})
+
 
 	permissionGrants = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "rbac_permission_grants_total",
@@ -63,7 +70,7 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(flatDocsTotal, usersTotal, permissionGrants, highRiskGrants, scrapeErrors, lastSuccessUnix)
+	prometheus.MustRegister(flatDocsTotal, usersTotal, permissionGrants, highRiskGrants, sensitiveAccessUsers, scrapeErrors, lastSuccessUnix)
 }
 
 func getenv(k, d string) string {
@@ -162,6 +169,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 	//reseting gauges to avoid stale label sets
 	permissionGrants.Reset()
 	highRiskGrants.Reset()
+	sensitiveAccessUsers.Reset()
 
 	// total docs in window
 	{
@@ -312,6 +320,92 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 							highRiskGrants.WithLabelValues(ns, res, verb, scope).Set(count)
 						}
 					}
+				}
+			}
+		}
+	}
+
+	// 4) sensitive resource access: distinct users per namespace/resource/verb for secrets, deployments, configmaps.
+	{
+		q := map[string]any{
+			"size": 0,
+			"query": map[string]any{
+				"bool": map[string]any{
+					"must": []map[string]any{
+						{
+							"range": map[string]any{
+								"@timestamp": map[string]any{
+									"gte": gte,
+									"lte": now.Format(time.RFC3339),
+								},
+							},
+						},
+						{
+							"terms": map[string]any{
+								"resource.keyword": []string{"secrets", "deployments", "configmaps"},
+							},
+						},
+					},
+				},
+			},
+			"aggs": map[string]any{
+				"ns": map[string]any{
+					"terms": map[string]any{"field": "namespace.keyword", "size": buckets},
+					"aggs": map[string]any{
+						"res": map[string]any{
+							"terms": map[string]any{"field": "resource.keyword", "size": 3},
+							"aggs": map[string]any{
+								"verb": map[string]any{
+									"terms": map[string]any{"field": "verb.keyword", "size": buckets},
+									"aggs": map[string]any{
+										"user_count": map[string]any{
+											"cardinality": map[string]any{
+												"field": "username.keyword",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		body, _ := json.Marshal(q)
+		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		if err != nil {
+			return fmt.Errorf("sensitive access query: %w", err)
+		}
+
+		var root map[string]any
+		if err := json.Unmarshal(respBody, &root); err != nil {
+			return fmt.Errorf("sensitive access decode: %w", err)
+		}
+
+		aggs, _ := root["aggregations"].(map[string]any)
+		nsAgg, _ := aggs["ns"].(map[string]any)
+		nsBuckets, _ := nsAgg["buckets"].([]any)
+
+		for _, nb := range nsBuckets {
+			nbm := nb.(map[string]any)
+			ns := fmt.Sprint(nbm["key"])
+			resAgg := nbm["res"].(map[string]any)
+			resBuckets := resAgg["buckets"].([]any)
+
+			for _, rb := range resBuckets {
+				rbm := rb.(map[string]any)
+				res := fmt.Sprint(rbm["key"])
+				verbAgg := rbm["verb"].(map[string]any)
+				verbBuckets := verbAgg["buckets"].([]any)
+
+				for _, vb := range verbBuckets {
+					vbm := vb.(map[string]any)
+					verb := fmt.Sprint(vbm["key"])
+					userCountAgg := vbm["user_count"].(map[string]any)
+					userCount := userCountAgg["value"].(float64)
+
+					sensitiveAccessUsers.WithLabelValues(ns, verb, res).Set(userCount)
 				}
 			}
 		}
