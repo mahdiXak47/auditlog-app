@@ -47,6 +47,10 @@ var (
 		Help: "Count of distinct users that have sensitive accesses (secrets, deployments, configmaps) for a verb in a resource in a namespace.",
 	}, []string{"namespace", "verb", "resource"})
 
+	clusterwideAccessUsers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "k8s_clusterwide_sensitive_access_users_count",
+		Help: "Count of distinct users that have cluster-wide access to important resources and verbs.",
+	}, []string{"resource", "verb"})
 
 	permissionGrants = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "rbac_permission_grants_total",
@@ -70,7 +74,7 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(flatDocsTotal, usersTotal, permissionGrants, highRiskGrants, sensitiveAccessUsers, scrapeErrors, lastSuccessUnix)
+	prometheus.MustRegister(flatDocsTotal, usersTotal, permissionGrants, highRiskGrants, sensitiveAccessUsers, clusterwideAccessUsers, scrapeErrors, lastSuccessUnix)
 }
 
 func getenv(k, d string) string {
@@ -170,6 +174,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 	permissionGrants.Reset()
 	highRiskGrants.Reset()
 	sensitiveAccessUsers.Reset()
+	clusterwideAccessUsers.Reset()
 
 	// total docs in window
 	{
@@ -407,6 +412,99 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 
 					sensitiveAccessUsers.WithLabelValues(ns, verb, res).Set(userCount)
 				}
+			}
+		}
+	}
+
+	// 5) cluster-wide sensitive access: distinct users per resource/verb for important resources with cluster scope.
+	{
+		importantResources := []string{
+			"secrets", "pods", "deployments", "daemonsets", "statefulsets",
+			"configmaps", "nodes", "persistentvolumes", "clusterroles",
+			"clusterrolebindings", "serviceaccounts", "namespaces",
+		}
+		importantVerbs := []string{
+			"create", "update", "delete", "patch", "*",
+		}
+
+		q := map[string]any{
+			"size": 0,
+			"query": map[string]any{
+				"bool": map[string]any{
+					"must": []map[string]any{
+						{
+							"range": map[string]any{
+								"@timestamp": map[string]any{
+									"gte": gte,
+									"lte": now.Format(time.RFC3339),
+								},
+							},
+						},
+						{
+							"term": map[string]any{
+								"scope.keyword": "Cluster",
+							},
+						},
+						{
+							"terms": map[string]any{
+								"resource.keyword": importantResources,
+							},
+						},
+						{
+							"terms": map[string]any{
+								"verb.keyword": importantVerbs,
+							},
+						},
+					},
+				},
+			},
+			"aggs": map[string]any{
+				"res": map[string]any{
+					"terms": map[string]any{"field": "resource.keyword", "size": len(importantResources)},
+					"aggs": map[string]any{
+						"verb": map[string]any{
+							"terms": map[string]any{"field": "verb.keyword", "size": len(importantVerbs)},
+							"aggs": map[string]any{
+								"user_count": map[string]any{
+									"cardinality": map[string]any{
+										"field": "username.keyword",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		body, _ := json.Marshal(q)
+		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		if err != nil {
+			return fmt.Errorf("clusterwide access query: %w", err)
+		}
+
+		var root map[string]any
+		if err := json.Unmarshal(respBody, &root); err != nil {
+			return fmt.Errorf("clusterwide access decode: %w", err)
+		}
+
+		aggs, _ := root["aggregations"].(map[string]any)
+		resAgg, _ := aggs["res"].(map[string]any)
+		resBuckets, _ := resAgg["buckets"].([]any)
+
+		for _, rb := range resBuckets {
+			rbm := rb.(map[string]any)
+			res := fmt.Sprint(rbm["key"])
+			verbAgg := rbm["verb"].(map[string]any)
+			verbBuckets := verbAgg["buckets"].([]any)
+
+			for _, vb := range verbBuckets {
+				vbm := vb.(map[string]any)
+				verb := fmt.Sprint(vbm["key"])
+				userCountAgg := vbm["user_count"].(map[string]any)
+				userCount := userCountAgg["value"].(float64)
+
+				clusterwideAccessUsers.WithLabelValues(res, verb).Set(userCount)
 			}
 		}
 	}
