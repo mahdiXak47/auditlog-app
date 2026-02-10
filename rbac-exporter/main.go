@@ -17,31 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type EsAggBucket struct {
-	Key      any   `json:"key"`
-	DocCount int64 `json:"doc_count"`
-}
-
-type EsTermsAgg struct {
-	Buckets []EsAggBucket `json:"buckets"`
-}
-
-type EsAggResp struct {
-	Aggregations map[string]json.RawMessage `json:"aggregations"`
-}
-
 var (
-	//flatDocsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
-	//	Name: "rbac_flat_docs_total",
-	//	Help: "Number of RBAC flat permission documents in the window.",
-	//})
-	//
-	//// number of distinct usernames seen in the window
-	//usersTotal = prometheus.NewGauge(prometheus.GaugeOpts{
-	//	Name: "rbac_users_total",
-	//	Help: "Number of distinct usernames seen in the window.",
-	//})
-
 	sensitiveAccessUsers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "k8s_namespace_sensitive_access_users_count",
 		Help: "Count of distinct users that have sensitive accesses (secrets, deployments, configmaps) for a verb in a resource in a namespace.",
@@ -51,30 +27,9 @@ var (
 		Name: "k8s_clusterwide_sensitive_access_users_count",
 		Help: "Count of distinct users that have cluster-wide access to important resources and verbs.",
 	}, []string{"resource", "verb"})
-
-	//permissionGrants = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-	//	Name: "rbac_permission_grants_total",
-	//	Help: "Count of permissions by namespace/resource/verb/scope in the window.",
-	//}, []string{"namespace", "resource", "verb", "scope"})
-	//
-	//highRiskGrants = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-	//	Name: "rbac_high_risk_grants_total",
-	//	Help: "Count of high-risk permissions (create/update/patch/delete) by namespace/resource/verb/scope in the window.",
-	//}, []string{"namespace", "resource", "verb", "scope"})
-	//
-	//scrapeErrors = prometheus.NewCounter(prometheus.CounterOpts{
-	//	Name: "rbac_exporter_scrape_errors_total",
-	//	Help: "Total number of exporter scrape/update errors.",
-	//})
-	//
-	//lastSuccessUnix = prometheus.NewGauge(prometheus.GaugeOpts{
-	//	Name: "rbac_exporter_last_success_unixtime",
-	//	Help: "Unix timestamp of last successful metrics refresh.",
-	//})
 )
 
 func init() {
-	//prometheus.MustRegister(flatDocsTotal, usersTotal, permissionGrants, highRiskGrants, sensitiveAccessUsers, clusterwideAccessUsers, scrapeErrors, lastSuccessUnix)
 	prometheus.MustRegister(sensitiveAccessUsers, clusterwideAccessUsers)
 }
 
@@ -119,7 +74,12 @@ func esDo(ctx context.Context, client *http.Client, baseURL,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
 	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, fmt.Errorf("response:%s: status:%s", resp.Status, string(b))
@@ -172,8 +132,6 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 	gte := now.Add(-window).Format(time.RFC3339)
 
 	//reseting gauges to avoid stale label sets
-	//permissionGrants.Reset()
-	//highRiskGrants.Reset()
 	sensitiveAccessUsers.Reset()
 	clusterwideAccessUsers.Reset()
 
@@ -206,7 +164,6 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		if err := json.Unmarshal(respBody, &parsed); err != nil {
 			return fmt.Errorf("docs count decode: %w", err)
 		}
-		//flatDocsTotal.Set(float64(parsed.Hits.Total.Value))
 	}
 
 	// 2) distinct users in window (cardinality agg)
@@ -243,7 +200,6 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		if err := json.Unmarshal(respBody, &parsed); err != nil {
 			return fmt.Errorf("users cardinality decode: %w", err)
 		}
-		//usersTotal.Set(parsed.Aggregations["u"].Value)
 	}
 
 	// 3) grants by namespace/resource/verb/scope (terms aggs)
@@ -291,44 +247,6 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		if err := json.Unmarshal(respBody, &root); err != nil {
 			return fmt.Errorf("grants agg decode: %w", err)
 		}
-
-		//aggs, _ := root["aggregations"].(map[string]any)
-		//nsAgg, _ := aggs["ns"].(map[string]any)
-		//nsBuckets, _ := nsAgg["buckets"].([]any)
-
-		//highRisk := map[string]bool{"create": true, "update": true, "patch": true, "delete": true}
-
-		//for _, nb := range nsBuckets {
-		//	nbm := nb.(map[string]any)
-		//	ns := fmt.Sprint(nbm["key"])
-		//	resAgg := nbm["res"].(map[string]any)
-		//	resBuckets := resAgg["buckets"].([]any)
-		//
-		//	for _, rb := range resBuckets {
-		//		rbm := rb.(map[string]any)
-		//		res := fmt.Sprint(rbm["key"])
-		//		verbAgg := rbm["verb"].(map[string]any)
-		//		verbBuckets := verbAgg["buckets"].([]any)
-		//
-		//		for _, vb := range verbBuckets {
-		//			vbm := vb.(map[string]any)
-		//			verb := fmt.Sprint(vbm["key"])
-		//			scopeAgg := vbm["scope"].(map[string]any)
-		//			scopeBuckets := scopeAgg["buckets"].([]any)
-		//
-		//			for _, sb := range scopeBuckets {
-		//				sbm := sb.(map[string]any)
-		//				scope := fmt.Sprint(sbm["key"])
-		//				count := sbm["doc_count"].(float64)
-		//
-		//				permissionGrants.WithLabelValues(ns, res, verb, scope).Set(count)
-		//				if highRisk[verb] {
-		//					highRiskGrants.WithLabelValues(ns, res, verb, scope).Set(count)
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
 	}
 
 	// 4) sensitive resource access: distinct users per namespace/resource/verb for secrets, deployments, configmaps.
@@ -510,6 +428,5 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		}
 	}
 
-	//lastSuccessUnix.Set(float64(time.Now().Unix()))
 	return nil
 }
