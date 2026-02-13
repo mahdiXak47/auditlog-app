@@ -91,7 +91,7 @@ func main() {
 	fmt.Printf("starting RBAC exporter app\n")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	esURL := getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+	esURL := getenv("ELASTICSEARCH_URL", "https://elasticsearch.mahdixak.ir/")
 	esUser := os.Getenv("ES_USERNAME")
 	esPass := os.Getenv("ES_PASSWORD")
 
@@ -107,7 +107,6 @@ func main() {
 	go func() {
 		for {
 			if err := refreshOnce(ctx, client, esURL, esUser, esPass, index, window, maxBuckets); err != nil {
-				//scrapeErrors.Inc()
 				log.Printf("failed to refresh buckets: %v", err)
 			} else {
 				log.Printf("buckets refreshed in index:%s and window:%s", index, window)
@@ -149,6 +148,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 			},
 		}
 		body, _ := json.Marshal(q)
+
 		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
 		if err != nil {
 			return fmt.Errorf("docs count query: %w", err)

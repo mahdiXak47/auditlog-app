@@ -1,7 +1,7 @@
 [
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "ali.ahmadi",
     "groups": ["devops","sre-production"],
     "scopes": [
@@ -163,7 +163,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "amir.karimi",
     "groups": ["devops","sre-production"],
     "scopes": [
@@ -325,7 +325,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "jafar.mohammadi",
     "groups": ["dev","qa"],
     "scopes": [
@@ -379,7 +379,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "leila.mohammadi",
     "groups": ["cluster-readonly","qa"],
     "scopes": [
@@ -465,7 +465,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "mohammad.jafari",
     "groups": ["cluster-readonly","sre-production"],
     "scopes": [
@@ -655,7 +655,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "neda.ahmadi",
     "groups": ["dev","qa"],
     "scopes": [
@@ -709,7 +709,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "reza.karimi",
     "groups": ["dev","sre-production"],
     "scopes": [
@@ -879,7 +879,7 @@
   },
   {
     "type": "rbac_effective_permissions",
-    "@timestamp": "2026-02-10T16:59:15Z",
+    "@timestamp": "2026-02-10T17:04:15Z",
     "username": "sara.mohammadi",
     "groups": ["cluster-readonly","qa"],
     "scopes": [
