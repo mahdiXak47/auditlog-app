@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -87,6 +89,31 @@ func esDo(ctx context.Context, client *http.Client, baseURL,
 	return b, nil
 }
 
+// basicAuth wraps h and returns 401 unless the request has valid Basic auth.
+// expectedHash is SHA256 of the valid password (from env); comparison is constant-time.
+// If expectedHash is nil/empty, h is served without auth.
+func basicAuth(h http.Handler, user string, expectedHash []byte) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(expectedHash) == 0 {
+			h.ServeHTTP(w, r)
+			return
+		}
+		u, p, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		enteredHash := sha256.Sum256([]byte(p))
+		if subtle.ConstantTimeCompare(enteredHash[:], expectedHash) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	fmt.Printf("starting RBAC exporter app\n")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -115,9 +142,20 @@ func main() {
 		}
 	}()
 
-	//metrics endpoints
+	metricsUser := getenv("METRICS_USERNAME", "prometheus")
+	metricsPass := os.Getenv("METRICS_PASSWORD")
+	var metricsPassHash []byte
+	if metricsPass != "" {
+		h := sha256.Sum256([]byte(metricsPass))
+		metricsPassHash = h[:]
+	}
+	metricsHandler := promhttp.Handler()
+	if len(metricsPassHash) > 0 {
+		metricsHandler = basicAuth(metricsHandler, metricsUser, metricsPassHash)
+	}
+
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", metricsHandler)
 
 	addr := getenv("LISTEN_ADDR", ":8080")
 	log.Printf("exporter listening on %s/metrics", addr)
