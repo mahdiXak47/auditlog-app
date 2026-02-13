@@ -49,6 +49,7 @@ func LoadInputFile(path string) (*InputFile, error) {
 	return &in, nil
 }
 
+// ExtractPrincipals extracting the user details from the input.json
 func ExtractPrincipals(in *InputFile) []Principal {
 	var out []Principal
 

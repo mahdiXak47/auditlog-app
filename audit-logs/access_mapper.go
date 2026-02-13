@@ -74,14 +74,14 @@ func FlattenReports(reports []UserAccessReport) []FlatPermission {
 
 func BuildReportsForAllNamespaces(
 	principals []Principal,
-	records []Access,
-	idx *roleIndex,
+	roleBindingList []Access,
+	rolesList *roleIndex,
 	namespaces []string,
 ) []UserAccessReport {
 
 	out := make([]UserAccessReport, 0, len(principals))
 	for _, p := range principals {
-		scopes := aggregateForPrincipalAllNamespaces(p, records, idx, namespaces)
+		scopes := aggregateForPrincipalAllNamespaces(p, roleBindingList, rolesList, namespaces)
 
 		out = append(out, UserAccessReport{
 			Type:      "rbac_effective_permissions",
@@ -94,6 +94,7 @@ func BuildReportsForAllNamespaces(
 	return out
 }
 
+// gathering the user information mapped to namespaces
 func aggregateForPrincipalAllNamespaces(
 	p Principal,
 	records []Access,
@@ -170,19 +171,6 @@ func aggregateForPrincipalAllNamespaces(
 
 	sort.Slice(scopes, func(i, j int) bool { return scopes[i].Namespace < scopes[j].Namespace })
 	return scopes
-	// Convert to []AccessEntry
-	//entries := make([]AccessEntry, 0, len(agg))
-	//for ns, res := range agg {
-	//	entries = append(entries, AccessEntry{
-	//		Namespace: ns,
-	//		//Resources: finalizeResources(res),
-	//		Resources: finalizeRules(res),
-	//		IsCluster: isClusterForNS[ns],
-	//	})
-	//}
-	//
-	//sort.Slice(entries, func(i, j int) bool { return entries[i].Namespace < entries[j].Namespace })
-	//return entries
 }
 
 func normalizeVerbs(in []string) []string {
@@ -197,63 +185,18 @@ func normalizeVerbs(in []string) []string {
 	return out
 }
 
-func resolveRules(idx *roleIndex, roleRefKind, roleRefName, bindingNamespace string) []rbacv1.PolicyRule {
+// mapping role references (from bindings) → actual permission rules (PolicyRules)
+func resolveRules(roles *roleIndex, roleRefKind, roleRefName, bindingNamespace string) []rbacv1.PolicyRule {
 	switch roleRefKind {
 	case "ClusterRole":
-		return idx.clusterRoleRules[roleRefName]
+		return roles.clusterRoleRules[roleRefName]
 	case "Role":
 		key := bindingNamespace + "/" + roleRefName
-		return idx.roleRules[key]
+		return roles.roleRules[key]
 	default:
 		return nil
 	}
 }
-
-//func finalizeResources(resourceVerbSet map[string]map[string]struct{}) ResourceVerbs {
-//	out := make(ResourceVerbs, len(resourceVerbSet))
-//	fullVerbSet := map[string]struct{}{
-//		"create": {},
-//		"delete": {},
-//		"get":    {},
-//		"list":   {},
-//		"patch":  {},
-//		"update": {},
-//		"watch":  {},
-//	}
-//	for res, verbSet := range resourceVerbSet {
-//
-//		// If rule already contains "*", no need to check further
-//		if _, hasWildcard := verbSet["*"]; hasWildcard {
-//			out[res] = []string{"*"}
-//			continue
-//		}
-//
-//		// Check if verbSet contains all full verbs
-//		hasAll := true
-//		for v := range fullVerbSet {
-//			if _, ok := verbSet[v]; !ok {
-//				hasAll = false
-//				break
-//			}
-//		}
-//
-//		if hasAll {
-//			out[res] = []string{"*"}
-//			continue
-//		}
-//
-//		// Otherwise output sorted verbs normally
-//		var verbs []string
-//		for v := range verbSet {
-//			verbs = append(verbs, v)
-//		}
-//		sort.Strings(verbs)
-//		out[res] = verbs
-//	}
-//
-//	// stable keys are handled by JSON marshaller order? not guaranteed, but fine.
-//	return out
-//}
 
 func finalizeRules(resourceVerbSet map[string]map[string]struct{}) []Rule {
 	out := make([]Rule, 0, len(resourceVerbSet))
@@ -314,12 +257,10 @@ func applyRulesToAgg(resourceVerbSet map[string]map[string]struct{}, rules []rba
 				resourceVerbSet[res][v] = struct{}{}
 			}
 		}
-
-		// (Optional later) NonResourceURLs support:
-		// for _, url := range rule.NonResourceURLs { ... }
 	}
 }
 
+// getting the namespace from binding
 func extractNamespaceFromBinding(binding string) string {
 	// format is "RoleBinding/<ns>/<name>" or "ClusterRoleBinding/<name>"
 	parts := strings.Split(binding, "/")
@@ -334,6 +275,7 @@ type roleIndex struct {
 	roleRules        map[string][]rbacv1.PolicyRule // "ns/name" -> rules
 }
 
+// parsing all roles and cluster roles together
 func buildRoleIndex(clusterRoles *rbacv1.ClusterRoleList, roles *rbacv1.RoleList) *roleIndex {
 	cr := make(map[string][]rbacv1.PolicyRule, len(clusterRoles.Items))
 	for _, r := range clusterRoles.Items {

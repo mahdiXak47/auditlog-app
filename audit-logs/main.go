@@ -27,25 +27,28 @@ type Access struct {
 	name        string
 	namespace   string
 	namespaced  bool
-	roleRefKind string
-	roleRefName string
-	binding     string
+	roleRefKind string // role or clusterRole
+	roleRefName string // role name
+	binding     string // name of the binding object that grants the access.
 }
 
 func main() {
+	// setting the proper needed interval (default is 5m)
 	var (
 		interval = flag.Duration("interval", 5*time.Minute, "Polling interval (e.g. 5m)")
 	)
 	flag.Parse()
 	println("audit log app has been started")
 
-	inputPath := getEnv("INPUT_PATH", "../shared/json-files/input.json")
-	in, err := LoadInputFile(inputPath)
+	in, err := LoadInputFile("../shared/json-files/input.json")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// principals is the object of user information
 	principals := ExtractPrincipals(in)
 
+	// connection to the kubernetes API server
 	kubernetesClient, err := buildKubernetesClient()
 	if err != nil {
 		log.Fatalln("failed to build kubernetes client from the kubeconfig")
@@ -53,6 +56,7 @@ func main() {
 
 	ctx := context.Background()
 
+	// timer to send request in each interval
 	ticket := time.NewTicker(*interval)
 	defer ticket.Stop()
 
@@ -65,9 +69,10 @@ func main() {
 }
 
 // running one full RBAC access collection + reporting cycle
-func executeRbacAccessCycle(
-	ctx context.Context, kubernetesClient *kubernetes.Clientset,
+func executeRbacAccessCycle(ctx context.Context, kubernetesClient *kubernetes.Clientset,
 	principals []Principal) error {
+
+	// this part is better to implement with env WARN
 	//runCtx, cancel := context.WithTimeout(ctx, 30*time.Second) // for production
 	runCtx, cancel := context.WithCancel(ctx) //for debugging
 	defer cancel()
@@ -77,25 +82,32 @@ func executeRbacAccessCycle(
 	if err != nil {
 		return fmt.Errorf("can not get the role binding list from kubernetes api server: %w", err)
 	}
+
+	//debugging logs
 	//fmt.Printf("clusterRbs=%+v\n", *clusterRbs)
 	//fmt.Printf("rbs=%+v\n", *rbs)
-	records := getRoleBindingsList(clusterRbs, rbs)
+
+	// parse role bindings together in allRoleBindingList
+	allRoleBindingList := getRoleBindingsList(clusterRbs, rbs)
 
 	var namespaceList []string
 	for _, ns := range namespaces.Items {
 		namespaceList = append(namespaceList, ns.Name)
 	}
-	idx := buildRoleIndex(clusterRoles, roles)
 
-	reports := BuildReportsForAllNamespaces(principals, records, idx, namespaceList)
+	// parse role and cluster roles together
+	allRolesList := buildRoleIndex(clusterRoles, roles)
 
-	//printReport(records)
-	outputPath := getEnv("OUTPUT_JSONL_PATH", "../shared/reports.jsonl")
+	// mapping the user accesses with allRolesList and allRoleBindingList
+	reports := BuildReportsForAllNamespaces(principals, allRoleBindingList, allRolesList, namespaceList)
+
+	//printReport(allRoleBindingList)
+	outputPath := "../shared/reports.jsonl"
 	if err := PrintReportsAsJson(outputPath, reports); err != nil {
 		return fmt.Errorf("printing the report as json got an error: %w", err)
 	}
 
-	flatPath := getEnv("OUTPUT_FLAT_JSONL_PATH", "../shared/reports-flat.jsonl")
+	flatPath := "../shared/reports-flat.jsonl"
 	flat := FlattenReports(reports)
 	if err := PrintFlatAsJsonL(flatPath, flat); err != nil {
 		return fmt.Errorf("writing flat report: %w", err)
@@ -130,7 +142,7 @@ func PrintReportsAsJson(path string, reports []UserAccessReport) error {
 	formatted := inlineVerbArrays(string(b))
 	fmt.Println(formatted)
 
-	debugOutputPath := getEnv("DEBUG_OUTPUT_PATH", "../shared/json-files/output-of-the-code.json")
+	debugOutputPath := "../shared/json-files/output-of-the-code.json"
 	err = os.WriteFile(debugOutputPath, []byte(formatted), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write json output: %w", err)
@@ -269,27 +281,33 @@ func receiveLogsFromApiServer(
 	*rbacv1.ClusterRoleList, *rbacv1.RoleList, *corev1.NamespaceList, error) {
 
 	opts := metav1.ListOptions{}
+
+	// getting list of cluster role bindings
 	crbs, err := client.RbacV1().ClusterRoleBindings().List(ctx, opts)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("can not get the cluster role binding list from cluster: %w", err)
 	}
 
+	// getting the list of role bindings for all namespaces
 	// "" means all namespaces
 	rbs, err := client.RbacV1().RoleBindings("").List(ctx, opts)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("can not get the role binding list from cluster: %w", err)
 	}
 
+	// getting cluster roles
 	clusterRoles, err := client.RbacV1().ClusterRoles().List(ctx, opts)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("can not get the cluster role list from cluster: %w", err)
 	}
 
+	// getting roles for all namespaces
 	roles, err := client.RbacV1().Roles("").List(ctx, opts)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("can not get the role list from cluster: %w", err)
 	}
 
+	// getting the list of cluster namespaces
 	namespaces, err := client.CoreV1().Namespaces().List(ctx, opts)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("can not get the namespace list from cluster: %w", err)
@@ -298,6 +316,7 @@ func receiveLogsFromApiServer(
 	return crbs, rbs, clusterRoles, roles, namespaces, nil
 }
 
+// sends a kubernetes server API client to send request
 func buildKubernetesClient() (*kubernetes.Clientset, error) {
 	if cfg, err := rest.InClusterConfig(); err == nil {
 		return kubernetes.NewForConfig(cfg)
@@ -312,11 +331,4 @@ func buildKubernetesClient() (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return kubernetes.NewForConfig(cfg)
-}
-
-func getEnv(key, defaultVal string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultVal
 }
