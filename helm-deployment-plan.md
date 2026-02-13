@@ -44,22 +44,20 @@ Prometheus
 
 ---
 
-## 2. Helm Chart Layout
+## 2. Helm Chart Layout (as implemented)
 
 ```
-security-task-chart/
+audit-logs-helm/
 ├── Chart.yaml
 ├── values.yaml
-├── values.schema.json          # optional
 ├── templates/
 │   ├── _helpers.tpl
-│   ├── configmap.yaml          # input.json (principals)
-│   ├── secret.yaml             # ES username/password (or reference existing)
 │   ├── serviceaccount.yaml
 │   ├── clusterrole.yaml
 │   ├── clusterrolebinding.yaml
 │   ├── deployment-audit.yaml   # Pod: audit-logs + sidecar
-│   ├── service-exporter.yaml  # Service for rbac-exporter
+│   ├── deployment-exporter.yaml
+│   ├── service-exporter.yaml   # Service for rbac-exporter
 │   ├── deployment-exporter.yaml
 │   └── NOTES.txt
 └── README.md
@@ -92,15 +90,30 @@ security-task-chart/
 
 ### 3.4 ConfigMap
 
-- **Name:** e.g. `security-audit-input`.
-- **Content:** `input.json` (principals to audit).
-- **Mount:** Into audit pod at e.g. `/shared/json-files/input.json` (or path matching `INPUT_PATH` env).
+- **Name:** e.g. `input-reader` (in the release namespace).
+- **Content:** `input.json` (principals to audit), created **outside** Helm:
+  ```bash
+  kubectl create configmap input-reader \\
+    -n <namespace> \\
+    --from-file=input.json=./json-files/input.json
+  ```
+- **Mount:** Helm mounts this existing ConfigMap into the audit pod at `/shared/json-files/input.json` (matching `INPUT_PATH`).
 
 ### 3.5 Secret
 
-- **Name:** e.g. `security-audit-es-credentials`.
-- **Data:** `ES_USERNAME`, `ES_PASSWORD` (or keys used by sidecar/exporter).
-- **Usage:** Mount as env or envFrom in sidecar and rbac-exporter. Support `existingSecret` in values to use a pre-created secret.
+- **Name:** e.g. `es-credentials` (in the release namespace).
+- **Data:** `username`, `password` (keys used by sidecar/exporter).
+- **Creation:** Managed **outside** Helm (not templated), for example:
+  ```bash
+  kubectl create secret generic es-credentials \\
+    -n <namespace> \\
+    --from-literal=username=... \\
+    --from-literal=password=...
+  ```
+- **Usage:** Helm reads this Secret via `valueFrom.secretKeyRef` in sidecar and rbac-exporter containers, using:
+  - `.Values.elasticsearch.existingSecret`
+  - `.Values.elasticsearch.usernameKey`
+  - `.Values.elasticsearch.passwordKey`
 
 ### 3.6 Deployment: Audit + Sidecar (single pod)
 
@@ -150,13 +163,15 @@ security-task-chart/
 
 ## 4. values.yaml Structure (Summary)
 
-- **Global:** imagePullPolicy, image registry.
-- **Images:** repository + tag (or digest) for audit-logs, sidecar, rbac-exporter.
-- **Elasticsearch:** url, index names; existingSecret or inline username/password.
-- **Config:** polling interval for audit-logs; window and poll interval for exporter; input principals (or reference to ConfigMap key).
-- **RBAC:** create ServiceAccount/ClusterRole/ClusterRoleBinding or not; names.
-- **Resources:** requests/limits for each container.
-- **Exporter:** replicas, service type.
+- **replicaCount:** separate settings for audit pod and exporter.
+- **image:** repositories/tags/pullPolicy for audit-logs, sidecar, rbac-exporter.
+- **serviceAccount:** `create` flag and name (e.g. `rbac-audit`).
+- **rbac:** `create` flag and names for ClusterRole/ClusterRoleBinding.
+- **config.auditLogs:** interval, paths (`INPUT_PATH`, outputs), existing ConfigMap name/key for `input.json`.
+- **config.sidecar:** flush size and poll interval.
+- **config.exporter:** window, poll interval, max buckets, listen address.
+- **elasticsearch:** URL, index names, existing Secret name + username/password keys.
+- **resources:** per-container `requests` and `limits` for CPU, memory, and `ephemeral-storage` (e.g. 500m CPU, 1Gi RAM, 512Mi ephemeral storage requested; 2 CPU, 4Gi RAM, 512Mi ephemeral storage limited).
 
 ---
 
@@ -175,11 +190,12 @@ No need for manual ordering if all are in `templates/` and no explicit dependenc
 
 ---
 
-## 6. Pre-Deployment Checklist
+## 6. Pre-Deployment Checklist (outside Helm)
 
 - [ ] Build and push images: audit-logs, sidecar, rbac-exporter.
-- [ ] Prepare `input.json` (principals) for ConfigMap or values.
-- [ ] Decide ES credentials: create new Secret or use existing (e.g. `existingSecret: "my-es-secret"`).
+- [ ] Prepare `input.json` (principals) for ConfigMap (`input-reader`).
+- [ ] Create `input-reader` ConfigMap in target namespace.
+- [ ] Create `es-credentials` Secret in target namespace with `username` and `password` keys.
 - [ ] Ensure cluster can pull images (imagePullSecrets if private registry).
 - [ ] Ensure network access from cluster to Elasticsearch (and from Prometheus to rbac-exporter).
 
@@ -189,18 +205,18 @@ No need for manual ordering if all are in `templates/` and no explicit dependenc
 
 ```bash
 # Install
-helm install security-audit ./security-task-chart \
+helm install audit-logs ./audit-logs-helm \
   --namespace security-system \
   --create-namespace \
   -f my-values.yaml
 
 # Upgrade
-helm upgrade security-audit ./security-task-chart \
+helm upgrade audit-logs ./audit-logs-helm \
   --namespace security-system \
   -f my-values.yaml
 
 # Dry-run
-helm install security-audit ./security-task-chart \
+helm install audit-logs ./audit-logs-helm \
   --namespace security-system \
   -f my-values.yaml --dry-run --debug
 ```
@@ -210,9 +226,9 @@ helm install security-audit ./security-task-chart \
 ## 8. Verification
 
 - **Pods:** `kubectl get pods -n security-system`
-- **RBAC:** `kubectl auth can-i list clusterroles --as=system:serviceaccount:security-system:security-audit` → yes
-- **Metrics:** `kubectl port-forward svc/rbac-exporter 8080:8080 -n security-system` then `curl http://localhost:8080/metrics`
-- **Logs:** `kubectl logs -n security-system -l app=security-audit -c audit-logs` and `-c sidecar`
+- **RBAC:** `kubectl auth can-i list clusterroles --as=system:serviceaccount:security-system:rbac-audit` → yes (adjust SA name if changed)
+- **Metrics (inside cluster):** `kubectl port-forward svc/<release-name>-exporter 8080:8080 -n security-system` then `curl http://localhost:8080/metrics`
+- **Logs:** `kubectl logs -n security-system -l app.kubernetes.io/instance=audit-logs -c audit-logs` and `-c sidecar`
 
 ---
 

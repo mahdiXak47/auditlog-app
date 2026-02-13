@@ -57,6 +57,17 @@ elasticsearch:
   usernameKey: "username"            # key in that Secret
   passwordKey: "password"            # key in that Secret
 
+ingress:
+  exporter:
+    enabled: false
+    className: ""        # e.g. "nginx" if you use ingress-nginx
+    annotations: {}
+    hosts:
+      - host: "metrics.mahdixak.ir"         
+        path: /metrics
+        pathType: Prefix
+    tls: []              # e.g. [{ hosts: ["rbac-exporter.mahdixak.ir"], secretName: "rbac-exporter-tls" }]
+
 resources: 
   auditLogs:
     requests:

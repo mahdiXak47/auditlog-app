@@ -1,0 +1,31 @@
+# One-off privileged pod to get a shell with access to the node (for proxy setup).
+# Schedule on the target node, then: kubectl exec -it node-shell -- nsenter ...
+# Delete after use: kubectl delete pod node-shell -n default
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-shell
+  namespace: default
+spec:
+  # Set to your node name to land on a specific node; remove to let scheduler choose.
+  # nodeName: my-node-name
+  hostPID: true
+  hostNetwork: true
+  containers:
+    - name: shell
+      image: docker.io/library/ubuntu:22.04
+      command: ["/bin/bash", "-c", "apt-get update && apt-get install -y util-linux && sleep infinity"]
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - name: host-root
+          mountPath: /host
+          readOnly: false
+  volumes:
+    - name: host-root
+      hostPath:
+        path: /
+        type: Directory
+  tolerations:
+    - operator: Exists
+  restartPolicy: Never

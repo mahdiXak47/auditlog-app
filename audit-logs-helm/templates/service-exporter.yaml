@@ -8,12 +8,13 @@ metadata:
     app.kubernetes.io/component: exporter
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - name: http-metrics
       port: 8080
       targetPort: http-metrics
       protocol: TCP
+      nodePort: 30080
   selector:
     app.kubernetes.io/name: {{ include "audit-logs.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}

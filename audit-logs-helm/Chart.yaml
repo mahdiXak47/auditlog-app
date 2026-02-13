@@ -4,8 +4,8 @@ description: Helm chart for kubernetes RBAC audit logs microservice
 type: application
 
 
-verison: 0.1.0
-appVersion: "0.1"
+version: 0.1.0
+appVersion: "0.1.0"
 
 keywords: 
   - audit    #for selecting the audit-logs app things
