@@ -235,12 +235,12 @@ func shipOnce(ctx context.Context, client *http.Client) error {
 	// Pipeline 1: nested snapshot docs
 	index := getenv("ELASTICSEARCH_INDEX", "audit-logs")
 	dataPath := getenv("ELASTICSEARCH_DATA_PATH", "../shared/reports.jsonl")
-	offsetPath := getenv("ELASTICSEARCH_OFFSET_PATH", "../shared/.offset")
+	offsetPath := getenv("ELASTICSEARCH_OFFSET_PATH", filepath.Join(filepath.Dir(dataPath), ".offset"))
 
 	// Pipeline 2: flat docs for Grafana
 	flatIndex := getenv("ELASTICSEARCH_FLAT_INDEX", "audit-logs-flat")
 	flatDataPath := getenv("ELASTICSEARCH_FLAT_DATA_PATH", "../shared/reports-flat.jsonl")
-	flatOffsetPath := getenv("ELASTICSEARCH_FLAT_OFFSET_PATH", "../shared/.offset-flat")
+	flatOffsetPath := getenv("ELASTICSEARCH_FLAT_OFFSET_PATH", filepath.Join(filepath.Dir(flatDataPath), ".offset-flat"))
 
 	log.Printf("sidecar tick | es=%s flushEvery=%d auth=%t", elasticSearchURL, flushEvery, esUser != "" || esPass != "")
 
