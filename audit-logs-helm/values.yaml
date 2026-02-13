@@ -1,0 +1,69 @@
+replicaCount: 
+  auditLogs: 1
+  exporter: 1
+
+image: 
+  auditLogs:
+    repository: mahdixak/rbac-audit
+    tag: "0.2"
+    pullPolicy: IfNotPresent
+  sidecar:
+    repository: mahdixak/rbac-sidecar
+    tag: "0.2"
+    pullPolicy: IfNotPresent
+  exporter:
+    repository: mahdixak/rbac-exporter
+    tag: "0.2"
+    pullPolicy: IfNotPresent
+
+serviceAccount: 
+  create: true
+  name: "rbac-audit"
+
+
+rbac:
+  create: true
+  clusterRoleName: "fetch-audits"
+  clusterRoleBindingName: "audit-fetcher"
+
+
+config: 
+  auditLogs:
+    interval: 5m
+    paths:
+      inputPath: /shared/json-files/input.json
+      outputJsonPath: /shared/reports.jsonl
+      outputFlatJsonPath: /shared/reports-flat.jsonl
+      debugOutputPath: /shared/json-files/output-of-the-code.json
+    input: 
+      existingConfigMap: "input-reader"
+      key: input.json
+
+  sidecar:
+    flushEvery: 10
+    pollEvery: 1s
+
+  exporter:
+    window: 24h
+    pollEvery: 30s
+    maxBuckets: 10
+    listenAddr: ":8080"
+
+elasticsearch:
+  url: https://elasticsearch.mahdixak.ir
+  index: audit-logs
+  flatIndex: audit-logs-flat
+  existingSecret: "es-credentials"   # name of a Secret created separately
+  usernameKey: "username"            # key in that Secret
+  passwordKey: "password"            # key in that Secret
+
+resources: 
+  auditLogs: {}
+  sidecar: {}
+  exporter: {}
+
+
+# nodeSelector: {}
+# tolerations: []
+# affinity: {}
+

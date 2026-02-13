@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "audit-logs.fullname" . }}-exporter
+  labels:
+    app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.exporter }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: exporter
+    spec:
+      containers:
+        - name: rbac-exporter
+          image: "{{ .Values.image.exporter.repository }}:{{ .Values.image.exporter.tag }}"
+          imagePullPolicy: {{ .Values.image.exporter.pullPolicy }}
+          env:
+            - name: ELASTICSEARCH_URL
+              value: {{ .Values.elasticsearch.url | quote }}
+            - name: ES_INDEX
+              value: {{ .Values.elasticsearch.flatIndex | quote }}
+            - name: WINDOW
+              value: {{ .Values.config.exporter.window | quote }}
+            - name: POLL_EVERY
+              value: {{ .Values.config.exporter.pollEvery | quote }}
+            - name: MAX_BUCKETS
+              value: {{ .Values.config.exporter.maxBuckets | quote }}
+            - name: LISTEN_ADDR
+              value: {{ .Values.config.exporter.listenAddr | quote }}
+            - name: ES_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.elasticsearch.existingSecret }}
+                  key: {{ .Values.elasticsearch.usernameKey }}
+            - name: ES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.elasticsearch.existingSecret }}
+                  key: {{ .Values.elasticsearch.passwordKey }}
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources.exporter | nindent 12 }}
+

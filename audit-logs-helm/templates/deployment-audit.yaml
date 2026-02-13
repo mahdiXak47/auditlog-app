@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "audit-logs.fullname" . }}-audit
+  labels:
+    app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.auditLogs }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      volumes:
+        - name: shared
+          emptyDir: {}
+        - name: audit-input
+          configMap:
+            name: {{ .Values.config.auditLogs.input.existingConfigMap }}
+            items:
+              - key: {{ .Values.config.auditLogs.input.key }}
+                path: input.json
+      containers:
+        - name: audit-logs
+          image: "{{ .Values.image.auditLogs.repository }}:{{ .Values.image.auditLogs.tag }}"
+          imagePullPolicy: {{ .Values.image.auditLogs.pullPolicy }}
+          args:
+            - "-interval={{ .Values.config.auditLogs.interval }}"
+          env:
+            - name: INPUT_PATH
+              value: {{ .Values.config.auditLogs.paths.inputPath | quote }}
+            - name: OUTPUT_JSONL_PATH
+              value: {{ .Values.config.auditLogs.paths.outputJsonPath | quote }}
+            - name: OUTPUT_FLAT_JSONL_PATH
+              value: {{ .Values.config.auditLogs.paths.outputFlatJsonPath | quote }}
+            - name: DEBUG_OUTPUT_PATH
+              value: {{ .Values.config.auditLogs.paths.debugOutputPath | quote }}
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+            - name: audit-input
+              mountPath: /shared/json-files
+              readOnly: true
+        - name: sidecar
+          image: "{{ .Values.image.sidecar.repository }}:{{ .Values.image.sidecar.tag }}"
+          imagePullPolicy: {{ .Values.image.sidecar.pullPolicy }}
+          env:
+            - name: ELASTICSEARCH_URL
+              value: {{ .Values.elasticsearch.url | quote }}
+            - name: ELASTICSEARCH_INDEX
+              value: {{ .Values.elasticsearch.index | quote }}
+            - name: ELASTICSEARCH_FLAT_INDEX
+              value: {{ .Values.elasticsearch.flatIndex | quote }}
+            - name: ELASTICSEARCH_DATA_PATH
+              value: {{ .Values.config.auditLogs.paths.outputJsonPath | quote }}
+            - name: ELASTICSEARCH_FLAT_DATA_PATH
+              value: {{ .Values.config.auditLogs.paths.outputFlatJsonPath | quote }}
+            - name: ELASTICSEARCH_OFFSET_PATH
+              value: "/shared/.offset"
+            - name: ELASTICSEARCH_FLAT_OFFSET_PATH
+              value: "/shared/.offset-flat"
+            - name: ES_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.elasticsearch.existingSecret }}
+                  key: {{ .Values.elasticsearch.usernameKey }}
+            - name: ES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.elasticsearch.existingSecret }}
+                  key: {{ .Values.elasticsearch.passwordKey }}
+            - name: FLUSH_EVERY
+              value: {{ .Values.config.sidecar.flushEvery | quote }}
+            - name: POLL_EVERY
+              value: {{ .Values.config.sidecar.pollEvery | quote }}
+          volumeMounts:
+            - name: shared
+              mountPath: /shared

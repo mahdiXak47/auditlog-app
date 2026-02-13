@@ -1,0 +1,24 @@
+apiVersion: v2
+name: audit-logs
+description: Helm chart for kubernetes RBAC audit logs microservice 
+type: application
+
+
+verison: 0.1.0
+appVersion: "0.1"
+
+keywords: 
+  - audit    #for selecting the audit-logs app things
+  - kubernetes #for selecting additional yaml files that i apply to cluster
+  - exporter #for selecting the rbac-exporter app things
+  - metrics #for selecting the sidecar container things
+
+
+home: https://github.com/mahdiXak47/auditlog-app
+sources: 
+  -  https://github.com/mahdiXak47/auditlog-app
+
+maintainers: 
+  - name: mahdixak
+    email: mahdiamcfc@gmail.com
+
