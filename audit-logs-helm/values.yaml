@@ -1,18 +1,13 @@
-replicaCount: 
+replicaCount:
   auditLogs: 1
-  exporter: 1
 
-image: 
+image:
   auditLogs:
     repository: mahdixak/rbac-audit
     tag: "0.2"
     pullPolicy: IfNotPresent
   sidecar:
     repository: mahdixak/rbac-sidecar
-    tag: "0.2"
-    pullPolicy: IfNotPresent
-  exporter:
-    repository: mahdixak/rbac-exporter
     tag: "0.2"
     pullPolicy: IfNotPresent
 
@@ -43,12 +38,6 @@ config:
     flushEvery: 10
     pollEvery: 1s
 
-  exporter:
-    window: 24h
-    pollEvery: 30s
-    maxBuckets: 10
-    listenAddr: ":8080"
-
 elasticsearch:
   url: https://elasticsearch.mahdixak.ir
   index: audit-logs
@@ -56,17 +45,6 @@ elasticsearch:
   existingSecret: "es-credentials"   # name of a Secret created separately
   usernameKey: "username"            # key in that Secret
   passwordKey: "password"            # key in that Secret
-
-ingress:
-  exporter:
-    enabled: false
-    className: ""        # e.g. "nginx" if you use ingress-nginx
-    annotations: {}
-    hosts:
-      - host: "metrics.mahdixak.ir"         
-        path: /metrics
-        pathType: Prefix
-    tls: []              # e.g. [{ hosts: ["rbac-exporter.mahdixak.ir"], secretName: "rbac-exporter-tls" }]
 
 resources: 
   auditLogs:
@@ -79,15 +57,6 @@ resources:
       memory: "4Gi"
       ephemeral-storage: "512Mi"
   sidecar:
-    requests:
-      cpu: "500m"
-      memory: "1Gi"
-      ephemeral-storage: "512Mi"
-    limits:
-      cpu: "2"
-      memory: "4Gi"
-      ephemeral-storage: "512Mi"
-  exporter:
     requests:
       cpu: "500m"
       memory: "1Gi"

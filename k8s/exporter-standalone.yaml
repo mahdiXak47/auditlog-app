@@ -1,0 +1,89 @@
+# Deploy only the rbac-exporter in the Prometheus cluster.
+# Prerequisites:
+# - Elasticsearch reachable from this cluster (same URL as audit cluster sidecar uses).
+# - Secret "es-credentials" in the same namespace with keys "username" and "password".
+#
+# Apply:
+#   kubectl create namespace audit-logs  # or use an existing namespace
+#   kubectl create secret generic es-credentials --from-literal=username=... --from-literal=password=... -n audit-logs
+#   kubectl apply -f k8s/exporter-standalone.yaml -n audit-logs
+#
+# Prometheus scrape (in-cluster):
+#   - job_name: 'rbac-exporter'
+#     static_configs:
+#       - targets: ['rbac-exporter.audit-logs.svc.cluster.local:8080']
+#     metrics_path: /metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rbac-exporter
+  labels:
+    app.kubernetes.io/name: rbac-exporter
+    app.kubernetes.io/component: exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rbac-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rbac-exporter
+        app.kubernetes.io/component: exporter
+    spec:
+      containers:
+        - name: rbac-exporter
+          image: mahdixak/rbac-exporter:0.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ELASTICSEARCH_URL
+              value: "https://elasticsearch.mahdixak.ir"
+            - name: ES_INDEX
+              value: "audit-logs-flat"
+            - name: WINDOW
+              value: "24h"
+            - name: POLL_EVERY
+              value: "30s"
+            - name: MAX_BUCKETS
+              value: "10"
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: ES_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: es-credentials
+                  key: username
+            - name: ES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: es-credentials
+                  key: password
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rbac-exporter
+  labels:
+    app.kubernetes.io/name: rbac-exporter
+    app.kubernetes.io/component: exporter
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-metrics
+      port: 8080
+      targetPort: http-metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rbac-exporter

@@ -9,6 +9,4 @@
 3. Audit pod (audit-logs + sidecar):
    kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
 
-4. Exporter metrics (Prometheus scrape target):
-   kubectl get svc -n {{ .Release.Namespace }} {{ include "audit-logs.fullname" . }}-exporter
-   Port 8080, path /metrics
+   Deploy rbac-exporter in the Prometheus cluster using k8s/exporter-standalone.yaml for metrics.
