@@ -20,6 +20,13 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      initContainers:
+        - name: reset-offset
+          image: busybox:1.36
+          command: ["sh", "-c", "rm -f /shared/.offset /shared/.offset-flat; echo 'offset files reset'"]
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
       volumes:
         - name: shared
           emptyDir: {}
@@ -68,10 +75,6 @@ spec:
               value: {{ .Values.config.auditLogs.paths.outputJsonPath | quote }}
             - name: ELASTICSEARCH_FLAT_DATA_PATH
               value: {{ .Values.config.auditLogs.paths.outputFlatJsonPath | quote }}
-            - name: ELASTICSEARCH_OFFSET_PATH
-              value: "/shared/.offset"
-            - name: ELASTICSEARCH_FLAT_OFFSET_PATH
-              value: "/shared/.offset-flat"
             - name: ES_USERNAME
               valueFrom:
                 secretKeyRef:
