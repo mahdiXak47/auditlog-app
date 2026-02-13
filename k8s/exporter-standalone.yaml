@@ -1,18 +1,23 @@
 # Deploy only the rbac-exporter in the Prometheus cluster.
 # Prerequisites:
 # - Elasticsearch reachable from this cluster (same URL as audit cluster sidecar uses).
-# - Secret "es-credentials" in the same namespace with keys "username" and "password".
+# - Secret "es-credentials" with keys "username" and "password".
+# - Secret "metrics-auth" with key "password" (basic auth for /metrics; user is "prometheus").
 #
 # Apply:
-#   kubectl create namespace audit-logs  # or use an existing namespace
+#   kubectl create namespace audit-logs
 #   kubectl create secret generic es-credentials --from-literal=username=... --from-literal=password=... -n audit-logs
+#   kubectl create secret generic metrics-auth --from-literal=password="$(openssl rand -base64 24)" -n audit-logs
 #   kubectl apply -f k8s/exporter-standalone.yaml -n audit-logs
 #
-# Prometheus scrape (in-cluster):
+# Prometheus scrape (in-cluster, with basic auth):
 #   - job_name: 'rbac-exporter'
 #     static_configs:
 #       - targets: ['rbac-exporter.audit-logs.svc.cluster.local:8080']
 #     metrics_path: /metrics
+#     basic_auth:
+#       username: prometheus
+#       password_file: /etc/prometheus/secrets/metrics-auth/password  # or use password: <string>
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,6 +63,13 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: es-credentials
+                  key: password
+            - name: METRICS_USERNAME
+              value: "prometheus"
+            - name: METRICS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: metrics-auth
                   key: password
           ports:
             - name: http-metrics
