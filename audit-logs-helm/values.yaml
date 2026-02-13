@@ -58,9 +58,33 @@ elasticsearch:
   passwordKey: "password"            # key in that Secret
 
 resources: 
-  auditLogs: {}
-  sidecar: {}
-  exporter: {}
+  auditLogs:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+      ephemeral-storage: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+      ephemeral-storage: "512Mi"
+  sidecar:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+      ephemeral-storage: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+      ephemeral-storage: "512Mi"
+  exporter:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+      ephemeral-storage: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+      ephemeral-storage: "512Mi"
 
 
 # nodeSelector: {}

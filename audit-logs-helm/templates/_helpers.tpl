@@ -1,4 +1,4 @@
-{{/*
+k{{/*
 Chart name (from Chart.yaml).
 */}}
 {{- define "audit-logs.name" -}}

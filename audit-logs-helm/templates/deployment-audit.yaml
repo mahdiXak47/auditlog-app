@@ -35,6 +35,8 @@ spec:
           imagePullPolicy: {{ .Values.image.auditLogs.pullPolicy }}
           args:
             - "-interval={{ .Values.config.auditLogs.interval }}"
+          resources:
+            {{- toYaml .Values.resources.auditLogs | nindent 12 }}
           env:
             - name: INPUT_PATH
               value: {{ .Values.config.auditLogs.paths.inputPath | quote }}
@@ -53,6 +55,8 @@ spec:
         - name: sidecar
           image: "{{ .Values.image.sidecar.repository }}:{{ .Values.image.sidecar.tag }}"
           imagePullPolicy: {{ .Values.image.sidecar.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources.sidecar | nindent 12 }}
           env:
             - name: ELASTICSEARCH_URL
               value: {{ .Values.elasticsearch.url | quote }}

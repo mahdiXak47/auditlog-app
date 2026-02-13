@@ -1,0 +1,14 @@
+1. Ensure the ConfigMap "{{ .Values.config.auditLogs.input.existingConfigMap }}" exists
+   with key "{{ .Values.config.auditLogs.input.key }}" (e.g. input.json):
+   kubectl create configmap {{ .Values.config.auditLogs.input.existingConfigMap }} \
+     -n {{ .Release.Namespace }} --from-file={{ .Values.config.auditLogs.input.key }}=./input.json
+
+2. Ensure the Secret "{{ .Values.elasticsearch.existingSecret }}" exists in {{ .Release.Namespace }}
+   with keys {{ .Values.elasticsearch.usernameKey }} and {{ .Values.elasticsearch.passwordKey }}.
+
+3. Audit pod (audit-logs + sidecar):
+   kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+4. Exporter metrics (Prometheus scrape target):
+   kubectl get svc -n {{ .Release.Namespace }} {{ include "audit-logs.fullname" . }}-exporter
+   Port 8080, path /metrics
