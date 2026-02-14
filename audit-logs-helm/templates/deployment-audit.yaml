@@ -20,6 +20,12 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- if .Values.elasticsearch.hostIP }}
+      hostAliases:
+        - ip: {{ .Values.elasticsearch.hostIP | quote }}
+          hostnames:
+            - {{ .Values.elasticsearch.hostname | default "elasticsearch.mahdixak.ir" | quote }}
+      {{- end }}
       initContainers:
         - name: reset-offset
           image: busybox:1.36
@@ -27,6 +33,15 @@ spec:
           volumeMounts:
             - name: shared
               mountPath: /shared
+        - name: copy-input
+          image: busybox:1.36
+          command: ["sh", "-c", "mkdir -p /shared/json-files && cp /configmap/input.json /shared/json-files/input.json && echo 'input.json copied'"]
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+            - name: audit-input
+              mountPath: /configmap
+              readOnly: true
       volumes:
         - name: shared
           emptyDir: {}
@@ -56,9 +71,6 @@ spec:
           volumeMounts:
             - name: shared
               mountPath: /shared
-            - name: audit-input
-              mountPath: /shared/json-files
-              readOnly: true
         - name: sidecar
           image: "{{ .Values.image.sidecar.repository }}:{{ .Values.image.sidecar.tag }}"
           imagePullPolicy: {{ .Values.image.sidecar.pullPolicy }}

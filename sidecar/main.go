@@ -82,7 +82,7 @@ func shipFileOnce(
 	f, err := os.Open(dataPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// file not ready yet
+			log.Printf("data file not ready (will retry): %s", dataPath)
 			return nil
 		}
 		return fmt.Errorf("open data file %s: %w", dataPath, err)
@@ -242,7 +242,7 @@ func shipOnce(ctx context.Context, client *http.Client) error {
 	flatDataPath := getenv("ELASTICSEARCH_FLAT_DATA_PATH", "../shared/reports-flat.jsonl")
 	flatOffsetPath := getenv("ELASTICSEARCH_FLAT_OFFSET_PATH", filepath.Join(filepath.Dir(flatDataPath), ".offset-flat"))
 
-	log.Printf("sidecar tick | es=%s flushEvery=%d auth=%t", elasticSearchURL, flushEvery, esUser != "" || esPass != "")
+	log.Printf("sidecar tick | es=%s data=%s flat=%s flushEvery=%d auth=%t", elasticSearchURL, dataPath, flatDataPath, flushEvery, esUser != "" || esPass != "")
 
 	if err := ensureIndex(ctx, client, elasticSearchURL, index, esUser, esPass); err != nil {
 		return fmt.Errorf("ensure nested index: %w", err)

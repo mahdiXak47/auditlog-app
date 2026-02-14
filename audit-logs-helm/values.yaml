@@ -8,7 +8,7 @@ image:
     pullPolicy: IfNotPresent
   sidecar:
     repository: mahdixak/rbac-sidecar
-    tag: "0.3"
+    tag: "0.4"
     pullPolicy: IfNotPresent
 
 serviceAccount: 
@@ -46,6 +46,9 @@ elasticsearch:
   existingSecret: "es-credentials"   # name of a Secret created separately
   usernameKey: "username"            # key in that Secret
   passwordKey: "password"            # key in that Secret
+  #  the host ip part implemented because if coreDNS do not resolve the domain this ip would be used
+  hostIP: "81.12.30.46"                         
+  hostname: "elasticsearch.mahdixak.ir"
 
 resources: 
   auditLogs:
