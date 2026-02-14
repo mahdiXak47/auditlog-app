@@ -27,8 +27,8 @@ var (
 
 	clusterwideAccessUsers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "k8s_clusterwide_sensitive_access_users_count",
-		Help: "Count of distinct users that have cluster-wide access to important resources and verbs.",
-	}, []string{"resource", "verb"})
+		Help: "Count of distinct users with cluster-wide access to important resources and verbs, per namespace.",
+	}, []string{"namespace", "resource", "verb"})
 )
 
 func init() {
@@ -416,15 +416,20 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 				},
 			},
 			"aggs": map[string]any{
-				"res": map[string]any{
-					"terms": map[string]any{"field": "resource.keyword", "size": len(importantResources)},
+				"ns": map[string]any{
+					"terms": map[string]any{"field": "namespace.keyword", "size": buckets},
 					"aggs": map[string]any{
-						"verb": map[string]any{
-							"terms": map[string]any{"field": "verb.keyword", "size": len(importantVerbs)},
+						"res": map[string]any{
+							"terms": map[string]any{"field": "resource.keyword", "size": len(importantResources)},
 							"aggs": map[string]any{
-								"user_count": map[string]any{
-									"cardinality": map[string]any{
-										"field": "username.keyword",
+								"verb": map[string]any{
+									"terms": map[string]any{"field": "verb.keyword", "size": len(importantVerbs)},
+									"aggs": map[string]any{
+										"user_count": map[string]any{
+											"cardinality": map[string]any{
+												"field": "username.keyword",
+											},
+										},
 									},
 								},
 							},
@@ -446,22 +451,29 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		}
 
 		aggs, _ := root["aggregations"].(map[string]any)
-		resAgg, _ := aggs["res"].(map[string]any)
-		resBuckets, _ := resAgg["buckets"].([]any)
+		nsAgg, _ := aggs["ns"].(map[string]any)
+		nsBuckets, _ := nsAgg["buckets"].([]any)
 
-		for _, rb := range resBuckets {
-			rbm := rb.(map[string]any)
-			res := fmt.Sprint(rbm["key"])
-			verbAgg := rbm["verb"].(map[string]any)
-			verbBuckets := verbAgg["buckets"].([]any)
+		for _, nb := range nsBuckets {
+			nbm := nb.(map[string]any)
+			ns := fmt.Sprint(nbm["key"])
+			resAgg := nbm["res"].(map[string]any)
+			resBuckets := resAgg["buckets"].([]any)
 
-			for _, vb := range verbBuckets {
-				vbm := vb.(map[string]any)
-				verb := fmt.Sprint(vbm["key"])
-				userCountAgg := vbm["user_count"].(map[string]any)
-				userCount := userCountAgg["value"].(float64)
+			for _, rb := range resBuckets {
+				rbm := rb.(map[string]any)
+				res := fmt.Sprint(rbm["key"])
+				verbAgg := rbm["verb"].(map[string]any)
+				verbBuckets := verbAgg["buckets"].([]any)
 
-				clusterwideAccessUsers.WithLabelValues(res, verb).Set(userCount)
+				for _, vb := range verbBuckets {
+					vbm := vb.(map[string]any)
+					verb := fmt.Sprint(vbm["key"])
+					userCountAgg := vbm["user_count"].(map[string]any)
+					userCount := userCountAgg["value"].(float64)
+
+					clusterwideAccessUsers.WithLabelValues(ns, res, verb).Set(userCount)
+				}
 			}
 		}
 	}

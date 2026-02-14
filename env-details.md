@@ -140,7 +140,7 @@ security-task/
 | `rbac_permission_grants_total` | GaugeVec | `namespace`, `resource`, `verb`, `scope` | Count of permission grants by dimensions. |
 | `rbac_high_risk_grants_total` | GaugeVec | `namespace`, `resource`, `verb`, `scope` | Count of high-risk permissions (create/update/patch/delete). |
 | `k8s_namespace_sensitive_access_users_count` | GaugeVec | `namespace`, `verb`, `resource` | Count of distinct users with access to sensitive resources (secrets, deployments, configmaps) per namespace. |
-| `k8s_clusterwide_sensitive_access_users_count` | GaugeVec | `resource`, `verb` | Count of distinct users with cluster-wide access to important resources. |
+| `k8s_clusterwide_sensitive_access_users_count` | GaugeVec | `namespace`, `resource`, `verb` | Count of distinct users with cluster-wide access to important resources and verbs, per namespace. |
 | `rbac_exporter_scrape_errors_total` | Counter | - | Total number of errors during metric collection. |
 | `rbac_exporter_last_success_unixtime` | Gauge | - | Unix timestamp of last successful metrics refresh. |
 ---
