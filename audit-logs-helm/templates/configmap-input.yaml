@@ -1,0 +1,13 @@
+{{- if .Values.config.auditLogs.input.createConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.config.auditLogs.input.existingConfigMap }}
+  labels:
+    app.kubernetes.io/name: {{ include "audit-logs.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  {{ .Values.config.auditLogs.input.key }}: |
+{{ .Files.Get "files/input.json" | indent 4 }}
+{{- end }}

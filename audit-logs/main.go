@@ -22,6 +22,13 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
+func getenv(k, d string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return d
+}
+
 type Access struct {
 	kind        string // user group or serviceAccount
 	name        string
@@ -40,7 +47,8 @@ func main() {
 	flag.Parse()
 	println("audit log app has been started")
 
-	in, err := LoadInputFile("../shared/json-files/input.json")
+	inputPath := getenv("INPUT_PATH", "/shared/json-files/input.json")
+	in, err := LoadInputFile(inputPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,12 +110,12 @@ func executeRbacAccessCycle(ctx context.Context, kubernetesClient *kubernetes.Cl
 	reports := BuildReportsForAllNamespaces(principals, allRoleBindingList, allRolesList, namespaceList)
 
 	//printReport(allRoleBindingList)
-	outputPath := "../shared/reports.jsonl"
+	outputPath := getenv("OUTPUT_JSONL_PATH", "/shared/reports.jsonl")
 	if err := PrintReportsAsJson(outputPath, reports); err != nil {
 		return fmt.Errorf("printing the report as json got an error: %w", err)
 	}
 
-	flatPath := "../shared/reports-flat.jsonl"
+	flatPath := getenv("OUTPUT_FLAT_JSONL_PATH", "/shared/reports-flat.jsonl")
 	flat := FlattenReports(reports)
 	if err := PrintFlatAsJsonL(flatPath, flat); err != nil {
 		return fmt.Errorf("writing flat report: %w", err)

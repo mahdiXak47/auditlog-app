@@ -4,11 +4,11 @@ replicaCount:
 image:
   auditLogs:
     repository: mahdixak/rbac-audit
-    tag: "0.2"
+    tag: "0.3"
     pullPolicy: IfNotPresent
   sidecar:
     repository: mahdixak/rbac-sidecar
-    tag: "0.2"
+    tag: "0.3"
     pullPolicy: IfNotPresent
 
 serviceAccount: 
@@ -30,7 +30,8 @@ config:
       outputJsonPath: /shared/reports.jsonl
       outputFlatJsonPath: /shared/reports-flat.jsonl
       debugOutputPath: /shared/json-files/output-of-the-code.json
-    input: 
+    input:
+      createConfigMap: true
       existingConfigMap: "input-reader"
       key: input.json
 

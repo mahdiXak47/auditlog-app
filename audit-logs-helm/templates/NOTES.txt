@@ -1,7 +1,5 @@
-1. Ensure the ConfigMap "{{ .Values.config.auditLogs.input.existingConfigMap }}" exists
-   with key "{{ .Values.config.auditLogs.input.key }}" (e.g. input.json):
-   kubectl create configmap {{ .Values.config.auditLogs.input.existingConfigMap }} \
-     -n {{ .Release.Namespace }} --from-file={{ .Values.config.auditLogs.input.key }}=./input.json
+1. ConfigMap "{{ .Values.config.auditLogs.input.existingConfigMap }}" is created by the chart when createConfigMap is true.
+   To use your own: set createConfigMap to false and create the ConfigMap manually.
 
 2. Ensure the Secret "{{ .Values.elasticsearch.existingSecret }}" exists in {{ .Release.Namespace }}
    with keys {{ .Values.elasticsearch.usernameKey }} and {{ .Values.elasticsearch.passwordKey }}.
