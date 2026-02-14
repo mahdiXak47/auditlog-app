@@ -150,10 +150,9 @@ func PrintReportsAsJson(path string, reports []UserAccessReport) error {
 	formatted := inlineVerbArrays(string(b))
 	fmt.Println(formatted)
 
-	debugOutputPath := "../shared/json-files/output-of-the-code.json"
-	err = os.WriteFile(debugOutputPath, []byte(formatted), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write json output: %w", err)
+	debugOutputPath := getenv("DEBUG_OUTPUT_PATH", "/shared/json-files/output-of-the-code.json")
+	if err := os.WriteFile(debugOutputPath, []byte(formatted), 0644); err != nil {
+		log.Printf("debug output write failed (non-fatal): %v", err)
 	}
 
 	enc := json.NewEncoder(f)

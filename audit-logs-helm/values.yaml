@@ -4,7 +4,7 @@ replicaCount:
 image:
   auditLogs:
     repository: mahdixak/rbac-audit
-    tag: "0.3"
+    tag: "0.4"
     pullPolicy: IfNotPresent
   sidecar:
     repository: mahdixak/rbac-sidecar
