@@ -37,7 +37,7 @@ A comprehensive Kubernetes RBAC auditing and monitoring system composed of three
 
 ## Services
 
-### 1. **audit-logs/** - RBAC Audit Service
+### 1. **audit-logs** - RBAC Audit Service
 Queries Kubernetes API for RBAC resources and maps them to user principals.
 
 - **Binary**: `rbac-audit`
@@ -45,7 +45,7 @@ Queries Kubernetes API for RBAC resources and maps them to user principals.
 - **Input**: `shared/json-files/input.json` (principals list)
 - **Output**: `shared/reports.jsonl`, `shared/reports-flat.jsonl`
 
-### 2. **sidecar/** - Elasticsearch Shipper
+### 2. **sidecar** - Elasticsearch Shipper
 Continuously reads audit logs and ships them to Elasticsearch.
 
 - **Binary**: `rbac-sidecar`
@@ -53,7 +53,7 @@ Continuously reads audit logs and ships them to Elasticsearch.
 - **Input**: `shared/reports*.jsonl`
 - **Output**: Elasticsearch indices (`audit-logs`, `audit-logs-flat`)
 
-### 3. **rbac-exporter/** - Prometheus Metrics Exporter
+### 3. **rbac-exporter** - Prometheus Metrics Exporter
 Queries Elasticsearch and exposes aggregated RBAC metrics.
 
 - **Binary**: `rbac-exporter`
@@ -64,23 +64,23 @@ Queries Elasticsearch and exposes aggregated RBAC metrics.
 ## Project Structure
 
 ```
-security-task/
-├── audit-logs/          # Audit microservice
+security-task
+├── audit-logs          # Audit microservice
 │   ├── main.go
 │   ├── access_mapper.go
 │   ├── input_loader.go
 │   ├── go.mod
 │   └── Dockerfile
-├── sidecar/             # Elasticsearch shipper
+├── sidecar             # Elasticsearch shipper
 │   ├── main.go
 │   ├── go.mod
 │   └── Dockerfile
-├── rbac-exporter/       # Prometheus exporter
+├── rbac-exporter       # Prometheus exporter
 │   ├── main.go
 │   ├── go.mod
 │   └── Dockerfile
-├── shared/              # Shared volume (config + runtime data)
-│   ├── json-files/      # Configuration files
+├── shared              # Shared volume (config + runtime data)
+│   ├── json-files      # Configuration files
 │   │   └── input.json
 │   ├── reports.jsonl
 │   ├── reports-flat.jsonl
@@ -89,45 +89,53 @@ security-task/
 └── env-details.md       # Environment variables documentation
 ```
 
+## Deployment Considerations
+
+### Shared Volume
+- Audit service and Sidecar must share a volume mounted at `./shared/` (or configure paths accordingly).
+- Typical Kubernetes pattern: Pod with two containers and a shared `emptyDir` volume.
+
+### Elasticsearch Access
+- Sidecar writes to Elasticsearch (requires write permissions).
+- RBAC Exporter reads from Elasticsearch (requires read permissions).
+- Both can use `ES_USERNAME` and `ES_PASSWORD` for authentication.
+
+### Input Configuration
+- `INPUT_PATH` should be mounted as ConfigMap or Secret in production (not baked into image).
+- Contains principals (users/groups) to audit from external source (e.g., SSO, LDAP).
+
+
 ## Quick Start
 
-### Build All Services
+### for building Services
 
 ```bash
 # Build audit-logs
 cd audit-logs
-docker build -t rbac-audit:latest .
+docker buildx build \
+  --platform linux/amd64 \
+  -t docker.io/mahdixak/rbac-audit:<TAG> \
+  --push .
 
 # Build sidecar
 cd ../sidecar
-docker build -t rbac-sidecar:latest .
+docker buildx build \
+  --platform linux/amd64 \
+  -t docker.io/mahdixak/rbac-sidecar:<TAG> \
+  --push .
 
 # Build rbac-exporter
 cd ../rbac-exporter
-docker build -t rbac-exporter:latest .
+docker buildx build \
+  --platform linux/amd64 \
+  -t docker.io/mahdixak/rbac-exporter:<TAG> \
+  --push .
+  
 ```
-
-### Run with Docker Compose
-
-See `env-details.md` for complete Docker Compose and Kubernetes deployment examples.
 
 ## Configuration
 
 All services are configured via environment variables. See [`env-details.md`](./env-details.md) for complete documentation.
-
-### Key Environment Variables
-
-**audit-logs:**
-- `INPUT_PATH`: Path to principals configuration (default: `../shared/json-files/input.json`)
-- `OUTPUT_JSONL_PATH`: Output path for audit reports (default: `../shared/reports.jsonl`)
-
-**sidecar:**
-- `ELASTICSEARCH_URL`: Elasticsearch cluster URL
-- `ELASTICSEARCH_DATA_PATH`: Path to read audit logs
-
-**rbac-exporter:**
-- `ELASTICSEARCH_URL`: Elasticsearch query endpoint
-- `LISTEN_ADDR`: HTTP server address for metrics
 
 ## Metrics
 
@@ -136,68 +144,13 @@ The `rbac-exporter` exposes the following Prometheus metrics:
 - `rbac_flat_docs_total`: Total RBAC documents
 - `rbac_users_total`: Distinct users count
 - `rbac_permission_grants_total`: Permission grants by namespace/resource/verb
-- `k8s_namespace_sensitive_access_users_count`: Users with sensitive access per namespace
-- `k8s_clusterwide_sensitive_access_users_count`: Users with cluster-wide access
 - `rbac_exporter_scrape_errors_total`: Scrape errors
 - `rbac_exporter_last_success_unixtime`: Last successful refresh timestamp
 
+important metrics:
+
+- `k8s_namespace_sensitive_access_users_count`: Users with sensitive access per namespace
+- `k8s_clusterwide_sensitive_access_users_count`: Users with cluster-wide access
+
 ---
-
-# Code Explanation 
-
-### type Access: 
-each access object represent for an access that some app or someone has to something
-
-### kind:
-means who has access app, group or user. possible values:
-- "User"
-- "Group"
-- "ServiceAccount"
-
-### name:
-name of the subject, depends on what is the value of kind
-
-### namespace:
-for users and group are empty and for serviceAccount is the namespace of the service
-
-### namespaces:
-tells that this access is namespaced or not
-
-### roleRefKind: 
-represent the type of role being referenced. possible values:
-- "Role"
-- "ClusterRole"
-
-### roleRefName:
-role name
-
-### binding:
-name of the binding object that grants the access.
-
-### example:
-```
-kind: RoleBinding
-metadata:
-  name: view-binding
-  namespace: dev
-subjects:
-- kind: User
-  name: alice
-roleRef:
-  kind: Role
-  name: view
-```
-turns into 
-```
-Access{
-    kind:        "User",
-    name:        "alice",
-    namespace:   "dev",
-    namespaced:  true,
-    roleRefKind: "Role",
-    roleRefName: "view",
-    binding:     "RoleBinding/dev/view-binding",
-}
-```
-
 

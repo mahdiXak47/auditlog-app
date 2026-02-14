@@ -2,6 +2,20 @@
 
 This document lists all environment variables used across the security-task project services.
 
+### Key Environment Variables
+
+**audit-logs:**
+- `INPUT_PATH`: Path to principals configuration (default: `../shared/json-files/input.json`)
+- `OUTPUT_JSONL_PATH`: Output path for audit reports (default: `../shared/reports.jsonl`)
+
+**sidecar:**
+- `ELASTICSEARCH_URL`: Elasticsearch cluster URL
+- `ELASTICSEARCH_DATA_PATH`: Path to read audit logs
+
+**rbac-exporter:**
+- `ELASTICSEARCH_URL`: Elasticsearch query endpoint
+- `LISTEN_ADDR`: HTTP server address for metrics
+
 ## Project Structure
 
 ```
@@ -23,15 +37,14 @@ security-task/
 │   ├── go.mod
 │   ├── go.sum
 │   └── Dockerfile
-└── shared/              # Shared data volume (mounted by audit-logs and sidecar)
-    ├── json-files/      # Configuration and output files
-    │   ├── input.json
-    │   ├── output.json
+└── shared/              # Shared data volume (emptyDir, mounted at /shared)
+    ├── json-files/      # Config and debug output (input.json from ConfigMap)
+    │   ├── input.json   # Copied by init container from ConfigMap
     │   └── output-of-the-code.json
     ├── reports.jsonl
     ├── reports-flat.jsonl
-    ├── .offset
-    └── .offset-flat
+    ├── .offset          # Sidecar read offset for nested (reset on pod start)
+    └── .offset-flat     # Sidecar read offset for flat (reset on pod start)
 ```
 
 ## Table of Contents
@@ -49,15 +62,16 @@ security-task/
 
 | Variable | Default Value | Type | Description |
 |----------|--------------|------|-------------|
-| `INPUT_PATH` | `../shared/json-files/input.json` | string | Path to the input configuration file containing principals (users/groups) to audit. |
-| `OUTPUT_JSONL_PATH` | `../shared/reports.jsonl` | string | Path to write nested JSONL audit reports (UserAccessReport format). |
-| `OUTPUT_FLAT_JSONL_PATH` | `../shared/reports-flat.jsonl` | string | Path to write flattened JSONL audit reports (FlatPermission format). |
-| `DEBUG_OUTPUT_PATH` | `../shared/json-files/output-of-the-code.json` | string | Path to write formatted JSON debug output (pretty-printed reports). |
+| `INPUT_PATH` | `/shared/json-files/input.json` | string | Path to the input configuration file containing principals (users/groups) to audit. |
+| `OUTPUT_JSONL_PATH` | `/shared/reports.jsonl` | string | Path to write nested JSONL audit reports (UserAccessReport format). |
+| `OUTPUT_FLAT_JSONL_PATH` | `/shared/reports-flat.jsonl` | string | Path to write flattened JSONL audit reports (FlatPermission format). |
+| `DEBUG_OUTPUT_PATH` | `/shared/json-files/output-of-the-code.json` | string | Path to write formatted JSON debug output (pretty-printed). If write fails, it is logged but non-fatal; JSONL outputs still proceed. |
 
 ### Notes
 - The audit service reads RBAC data from Kubernetes API and maps it to principals from `INPUT_PATH`.
 - Output files are appended to on each run (no rotation built-in).
-- Shared directory (`./shared/`) is mounted as a shared volume containing both config files and runtime data.
+- Shared directory is mounted at `/shared` (emptyDir) with config files and runtime data.
+- Init container `copy-input` copies ConfigMap into `/shared/json-files/input.json`.
 
 ---
 
@@ -72,10 +86,10 @@ security-task/
 | `ELASTICSEARCH_URL` | `https://mahdixak-security-auditdb.darkube.app/` | string | Elasticsearch cluster URL. |
 | `ELASTICSEARCH_INDEX` | `audit-logs` | string | Index name for nested audit reports. |
 | `ELASTICSEARCH_FLAT_INDEX` | `audit-logs-flat` | string | Index name for flattened audit reports. |
-| `ELASTICSEARCH_DATA_PATH` | `../shared/reports.jsonl` | string | Path to read nested audit reports from (must match audit service output). |
-| `ELASTICSEARCH_FLAT_DATA_PATH` | `../shared/reports-flat.jsonl` | string | Path to read flattened audit reports from (must match audit service output). |
-| `ELASTICSEARCH_OFFSET_PATH` | `../shared/.offset` | string | File to track read offset for nested reports (for idempotent reads). |
-| `ELASTICSEARCH_FLAT_OFFSET_PATH` | `../shared/.offset-flat` | string | File to track read offset for flattened reports (for idempotent reads). |
+| `ELASTICSEARCH_DATA_PATH` | `../shared/reports.jsonl` | string | Path to read nested audit reports (must match audit output). |
+| `ELASTICSEARCH_FLAT_DATA_PATH` | `../shared/reports-flat.jsonl` | string | Path to read flattened audit reports (must match audit output). |
+| `ELASTICSEARCH_OFFSET_PATH` | _(derived from data path)_ | string | File to track read offset for nested reports. Default: same dir as data path, `.offset`. |
+| `ELASTICSEARCH_FLAT_OFFSET_PATH` | _(derived from flat data path)_ | string | File to track read offset for flattened reports. Default: same dir, `.offset-flat`. |
 | `ES_USERNAME` | _(empty)_ | string | Elasticsearch basic auth username (optional). |
 | `ES_PASSWORD` | _(empty)_ | string | Elasticsearch basic auth password (optional). |
 | `FLUSH_EVERY` | `10` | int | Number of documents to batch before flushing to Elasticsearch. |
@@ -84,9 +98,9 @@ security-task/
 ### Notes
 - Sidecar continuously reads from JSONL files and ships data to Elasticsearch.
 - Uses content hash (`sha256`) as document `_id` for idempotency.
+- Init container `reset-offset` clears `.offset` and `.offset-flat` on pod start.
 - On file truncation/rotation, offset resets to 0.
 - Creates indices automatically if they don't exist.
-
 ---
 
 ## RBAC Exporter Service
@@ -129,181 +143,9 @@ security-task/
 | `k8s_clusterwide_sensitive_access_users_count` | GaugeVec | `resource`, `verb` | Count of distinct users with cluster-wide access to important resources. |
 | `rbac_exporter_scrape_errors_total` | Counter | - | Total number of errors during metric collection. |
 | `rbac_exporter_last_success_unixtime` | Gauge | - | Unix timestamp of last successful metrics refresh. |
+---
+
+![Prometheus RBAC metrics: k8s_clusterwide_sensitive_access_users_count and k8s_namespace_sensitive_access_users_count](image.png)
 
 ---
 
-## Service Integration Flow
-
-```
-┌─────────────────────┐
-│  Kubernetes API     │
-│  (RBAC resources)   │
-└──────────┬──────────┘
-           │
-           │ (poll)
-           ▼
-┌─────────────────────┐      ┌──────────────────────┐
-│   Audit Service     │─────▶│  shared/ volume      │
-│   (rbac-audit)      │      │  - reports.jsonl     │
-│                     │      │  - reports-flat.jsonl│
-│ Reads: INPUT_PATH   │      │  - .offset           │
-│ Writes: shared/     │      │  - .offset-flat      │
-└─────────────────────┘      └──────────┬───────────┘
-                                        │
-                                        │ (poll & read)
-                                        ▼
-                             ┌──────────────────────┐
-                             │  Sidecar Service     │
-                             │  (rbac-sidecar)      │
-                             │                      │
-                             │ Reads: shared/       │
-                             │ Writes: Elasticsearch│
-                             └──────────┬───────────┘
-                                        │
-                                        │ (bulk index)
-                                        ▼
-                             ┌──────────────────────┐
-                             │   Elasticsearch      │
-                             │   (audit-logs*)      │
-                             └──────────┬───────────┘
-                                        │
-                                        │ (query)
-                                        ▼
-                             ┌──────────────────────┐
-                             │  RBAC Exporter       │
-                             │  (rbac-exporter)     │
-                             │                      │
-                             │ Reads: Elasticsearch │
-                             │ Exposes: /metrics    │
-                             └──────────┬───────────┘
-                                        │
-                                        │ (scrape)
-                                        ▼
-                             ┌──────────────────────┐
-                             │    Prometheus        │
-                             └──────────────────────┘
-```
-
----
-
-## Deployment Considerations
-
-### Shared Volume
-- Audit service and Sidecar must share a volume mounted at `./shared/` (or configure paths accordingly).
-- Typical Kubernetes pattern: Pod with two containers and a shared `emptyDir` volume.
-
-### Elasticsearch Access
-- Sidecar writes to Elasticsearch (requires write permissions).
-- RBAC Exporter reads from Elasticsearch (requires read permissions).
-- Both can use `ES_USERNAME` and `ES_PASSWORD` for authentication.
-
-### Input Configuration
-- `INPUT_PATH` should be mounted as ConfigMap or Secret in production (not baked into image).
-- Contains principals (users/groups) to audit from external source (e.g., SSO, LDAP).
-
----
-
-## Example Configuration
-
-### Docker Compose
-```yaml
-version: '3.8'
-services:
-  audit:
-    build:
-      context: ./audit-logs
-      dockerfile: Dockerfile
-    image: rbac-audit:latest
-    environment:
-      INPUT_PATH: /shared/json-files/input.json
-      OUTPUT_JSONL_PATH: /shared/reports.jsonl
-      OUTPUT_FLAT_JSONL_PATH: /shared/reports-flat.jsonl
-      DEBUG_OUTPUT_PATH: /shared/json-files/output-of-the-code.json
-    volumes:
-      - shared-data:/shared
-    command: ["-interval=5m"]
-
-  sidecar:
-    build:
-      context: ./sidecar
-      dockerfile: Dockerfile
-    image: rbac-sidecar:latest
-    environment:
-      ELASTICSEARCH_URL: https://elasticsearch.example.com
-      ELASTICSEARCH_DATA_PATH: /shared/reports.jsonl
-      ELASTICSEARCH_FLAT_DATA_PATH: /shared/reports-flat.jsonl
-      ELASTICSEARCH_OFFSET_PATH: /shared/.offset
-      ELASTICSEARCH_FLAT_OFFSET_PATH: /shared/.offset-flat
-      ES_USERNAME: elastic
-      ES_PASSWORD: changeme
-      FLUSH_EVERY: 50
-      POLL_EVERY: 5s
-    volumes:
-      - shared-data:/shared
-    depends_on:
-      - audit
-
-  exporter:
-    build:
-      context: ./rbac-exporter
-      dockerfile: Dockerfile
-    image: rbac-exporter:latest
-    environment:
-      ELASTICSEARCH_URL: https://elasticsearch.example.com
-      ES_USERNAME: elastic
-      ES_PASSWORD: changeme
-      WINDOW: 48h
-      POLL_EVERY: 60s
-      MAX_BUCKETS: 20
-    ports:
-      - "8080:8080"
-
-volumes:
-  shared-data:
-```
-
-### Kubernetes Deployment
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: rbac-audit-pod
-spec:
-  containers:
-  - name: audit
-    image: rbac-audit:latest
-    env:
-    - name: INPUT_PATH
-      value: /shared/json-files/input.json
-    - name: OUTPUT_JSONL_PATH
-      value: /shared/reports.jsonl
-    volumeMounts:
-    - name: shared
-      mountPath: /shared
-
-  - name: sidecar
-    image: rbac-sidecar:latest
-    env:
-    - name: ELASTICSEARCH_URL
-      value: https://elasticsearch.example.com
-    - name: ES_USERNAME
-      valueFrom:
-        secretKeyRef:
-          name: es-creds
-          key: username
-    - name: ES_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: es-creds
-          key: password
-    volumeMounts:
-    - name: shared
-      mountPath: /shared
-
-  volumes:
-  - name: shared
-    emptyDir: {}
-  
-  # Note: Mount input.json as ConfigMap into shared/json-files/ 
-  # initContainers can be used to copy ConfigMap data into shared volume
-```
