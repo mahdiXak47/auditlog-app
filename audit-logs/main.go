@@ -54,6 +54,7 @@ func main() {
 	}
 
 	// principals is the object of user information
+	// user details fetched from input.json
 	principals := ExtractPrincipals(in)
 
 	// connection to the kubernetes API server

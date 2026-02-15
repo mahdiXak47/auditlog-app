@@ -60,7 +60,7 @@ func getenvInt(k string, d int) int {
 	return d
 }
 
-func esDo(ctx context.Context, client *http.Client, baseURL,
+func fetchDataFromES(ctx context.Context, client *http.Client, baseURL,
 	esUser, esPass, path string, body []byte) ([]byte, error) {
 	u := strings.TrimRight(baseURL, "/") + path
 	req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(body))
@@ -148,6 +148,9 @@ func main() {
 	if metricsPass != "" {
 		h := sha256.Sum256([]byte(metricsPass))
 		metricsPassHash = h[:]
+		log.Printf("metrics endpoint: basic auth enabled (user=%s)", metricsUser)
+	} else {
+		log.Printf("WARNING: METRICS_PASSWORD not set; /metrics is unauthenticated")
 	}
 	metricsHandler := promhttp.Handler()
 	if len(metricsPassHash) > 0 {
@@ -187,7 +190,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		}
 		body, _ := json.Marshal(q)
 
-		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		respBody, err := fetchDataFromES(ctx, client, url, user, pass, "/"+index+"/_search", body)
 		if err != nil {
 			return fmt.Errorf("docs count query: %w", err)
 		}
@@ -225,7 +228,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 			},
 		}
 		body, _ := json.Marshal(q)
-		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		respBody, err := fetchDataFromES(ctx, client, url, user, pass, "/"+index+"/_search", body)
 		if err != nil {
 			return fmt.Errorf("users cardinality query: %w", err)
 		}
@@ -275,7 +278,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		}
 
 		body, _ := json.Marshal(q)
-		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		respBody, err := fetchDataFromES(ctx, client, url, user, pass, "/"+index+"/_search", body)
 		if err != nil {
 			return fmt.Errorf("grants agg query: %w", err)
 		}
@@ -335,7 +338,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		}
 
 		body, _ := json.Marshal(q)
-		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		respBody, err := fetchDataFromES(ctx, client, url, user, pass, "/"+index+"/_search", body)
 		if err != nil {
 			return fmt.Errorf("sensitive access query: %w", err)
 		}
@@ -440,7 +443,7 @@ func refreshOnce(ctx context.Context, client *http.Client, url string, user stri
 		}
 
 		body, _ := json.Marshal(q)
-		respBody, err := esDo(ctx, client, url, user, pass, "/"+index+"/_search", body)
+		respBody, err := fetchDataFromES(ctx, client, url, user, pass, "/"+index+"/_search", body)
 		if err != nil {
 			return fmt.Errorf("clusterwide access query: %w", err)
 		}

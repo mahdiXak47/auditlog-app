@@ -1,3 +1,5 @@
+# Set METRICS_USERNAME and METRICS_PASSWORD via your platform's env/config to enable basic auth.
+# If METRICS_PASSWORD is empty, /metrics is served without authentication.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -46,11 +48,8 @@ spec:
                   key: password
             - name: METRICS_USERNAME
               value: "prometheus"
-            - name: METRICS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: metrics-auth
-                  key: password
+            # METRICS_PASSWORD: set via your platform's env (e.g. Darkube env vars).
+            # When set, /metrics requires Basic auth (browser popup). Username=METRICS_USERNAME, password=METRICS_PASSWORD.
           ports:
             - name: http-metrics
               containerPort: 8080

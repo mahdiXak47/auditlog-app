@@ -114,11 +114,13 @@ func aggregateForPrincipalAllNamespaces(
 	agg := make(map[string]map[string]map[string]struct{})
 	isClusterForNS := make(map[string]bool)
 
+	// check for ns in agg
 	ensureNS := func(ns string) {
 		if _, ok := agg[ns]; !ok {
 			agg[ns] = make(map[string]map[string]struct{})
 		}
 	}
+
 
 	for _, rec := range records {
 		subKey := rec.kind + ":" + rec.name
@@ -138,6 +140,7 @@ func aggregateForPrincipalAllNamespaces(
 			if len(rules) == 0 {
 				continue
 			}
+			//getting the list of resources and verbs from the rules for this namespace
 			applyRulesToAgg(agg[ns], rules)
 
 		} else {
@@ -149,6 +152,7 @@ func aggregateForPrincipalAllNamespaces(
 			for _, ns := range allNamespaces {
 				ensureNS(ns)
 				isClusterForNS[ns] = true
+				//getting the list of resources and verbs from the rules for this namespace
 				applyRulesToAgg(agg[ns], rules)
 			}
 		}
@@ -240,6 +244,7 @@ func finalizeRules(resourceVerbSet map[string]map[string]struct{}) []Rule {
 
 // Adds rules into resource->verbSet.
 // Note: This ignores APIGroup and non-resource URLs for now (you can add later).
+// example output: Set["pods"] = {"get", "list", "delete"}
 func applyRulesToAgg(resourceVerbSet map[string]map[string]struct{}, rules []rbacv1.PolicyRule) {
 	for _, rule := range rules {
 		verbs := normalizeVerbs(rule.Verbs)
